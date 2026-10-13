@@ -16,6 +16,10 @@ class Content:
             .splitlines(keepends=True)
         )
 
+    async def iter_chunked(self, size):
+        while self.lines:
+            yield self.lines.pop(0)
+
     def __aiter__(self):
         return self
 
@@ -60,7 +64,13 @@ async def test_failed_or_truncated_stream(events):
 
 @pytest.mark.parametrize(
     "status,exception",
-    [(401, AuthError), (403, AuthError), (429, api.ModelError), (500, api.ModelError), (302, api.ModelError)],
+    [
+        (401, AuthError),
+        (403, api.ModelError),
+        (429, api.ModelError),
+        (500, api.ModelError),
+        (302, api.ModelError),
+    ],
 )
 async def test_status_failures(status, exception):
     with pytest.raises(exception):
@@ -103,3 +113,66 @@ async def test_gaps_in_completed_output_are_rejected():
     ]
     with pytest.raises(api.ModelError, match=r"\[missing_output_item\]"):
         await api.response(Session(events), "secret", "model", [], [])
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "subscription_sharing_usage_limit_exceeded",
+        "subscription_sharing_usage_unavailable",
+        "subscription_sharing_unsupported_capability",
+        "server_error",
+        "model_not_found",
+    ],
+)
+async def test_specific_stream_error_without_provider_message(code):
+    events = [
+        {
+            "type": "response.failed",
+            "response": {
+                "error": {
+                    "code": code,
+                    "message": "private prompt and secret credentials",
+                    "param": "tools[0].parameters.private_device_name",
+                }
+            },
+        }
+    ]
+    with pytest.raises(api.ModelError) as err:
+        await api.response(Session(events), "secret", "model", [], [])
+    assert "[" + code in str(err.value)
+    assert "parameter=tools" in str(err.value)
+    assert "private" not in str(err.value)
+    assert "secret" not in str(err.value)
+
+
+def test_unknown_error_fields_not_echoed():
+    err = api.provider_error(
+        {"code": "private-token", "message": "secret", "param": "private-device"}, "response_failed"
+    )
+    assert "[response_failed]" in str(err)
+    assert not any(value in str(err) for value in ["private", "secret"])
+
+
+def test_top_level_error_event_and_incomplete_reason():
+    err = api.provider_error({"type": "error", "code": "unsupported_parameter", "param": "include"}, "error")
+    assert "[unsupported_parameter; parameter=include]" in str(err)
+    err = api.provider_error(
+        {"response": {"incomplete_details": {"reason": "max_output_tokens"}}}, "response_incomplete"
+    )
+    assert "reason=max_output_tokens" in str(err)
+
+
+async def test_http_error_object_is_classified():
+    content = Content([])
+    content.lines = [
+        json.dumps(
+            {"error": {"code": "subscription_sharing_user_not_eligible", "message": "private"}}
+        ).encode()
+    ]
+    body = await api.error_body(content)
+    err = api.provider_error(body, "http_error", 403)
+    assert isinstance(err, api.ModelError)  # Policy restriction must not trigger an OAuth loop.
+    assert "subscription_sharing_user_not_eligible" in str(err)
+    assert "http=403" in str(err)
+    assert "private" not in str(err)

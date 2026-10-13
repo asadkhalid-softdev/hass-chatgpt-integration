@@ -126,7 +126,7 @@ Remove the integration entry to delete local config credentials and its rotated-
 | Helper reports a token-verification failure | Share only the bracketed reason code (for example `audience_mismatch` or `nonce_mismatch`). Never share tokens or credential JSON. |
 | Credentials rejected | Sign in again; import before access-token expiry; use the complete JSON and same registration for reauth. |
 | No models available | OpenAI did not return eligible visible models for this account. Check workspace policy. |
-| Usage limit or incomplete response | Review ChatGPT Usage. Check device state before retrying; earlier actions may already have run. |
+| Usage limit or incomplete response | Version 0.1.6 reports a bracketed provider code. Share that code and the selected model; review ChatGPT Usage only when the code indicates a usage limit. Check device state before retrying. |
 | Assistant cannot see a device | Enable home access, expose the entity, assign appropriate names/areas, and check Assist supports its intent. |
 | Integration absent | Check `/config/custom_components/chatgpt_assist/manifest.json`, HA version, dependencies and restart. |
 | `_Unsupported` serialization error with home access enabled | Update to 0.1.4 or newer through HACS, restart HA, and start a new Assist conversation. |

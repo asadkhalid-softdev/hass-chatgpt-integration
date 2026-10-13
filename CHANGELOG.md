@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.6
+
+- Surface sanitized provider failure codes and request-parameter roots for failed/incomplete streams and bounded HTTP error responses. Distinguish app/plan limits, eligibility, unsupported capabilities, model availability and temporary service failures.
+- Keep provider message/detail fields and dynamic parameter names out of Assist and logs. Add safe failure messages to the integration log.
+- Preserve credentials for HTTP 403 policy/eligibility restrictions rather than starting an OAuth retry loop.
+
 ## 0.1.5
 
 - Fix completed ChatGPT plan requests returning no answer: collect `response.output_item.done` events when the terminal `response.completed` event contains an empty output list.

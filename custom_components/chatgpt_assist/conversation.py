@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 
 from homeassistant.components import conversation
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -15,6 +16,8 @@ from .auth import AuthError, ConnectionError
 from .compat import schema as vol
 from .compat import schema_to_json
 from .const import DEFAULT_PROMPT, DOMAIN, MAX_ROUNDS, MAX_TOOL_CALLS, NAMESPACE
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, entry: ChatGPTConfigEntry, async_add_entities):
@@ -120,6 +123,7 @@ class ChatGPTConversation(conversation.ConversationEntity):
                     user_input, chat_log, "ChatGPT session expired. Reauthenticate ChatGPT Assist."
                 )
             except (ConnectionError, ModelError) as err:
+                _LOGGER.warning("ChatGPT Assist request failed: %s", err)
                 # These integration errors contain only sanitized messages, never raw
                 # provider response bodies, prompts, credentials or tool arguments.
                 return self._error(
