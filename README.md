@@ -6,6 +6,7 @@ A custom conversation integration that signs in with your **ChatGPT account** an
 
 ## What it does
 
+- Inspect automation triggers/conditions/actions and dashboard configuration, prepare drafts, and apply or restore them through an administrator review form when separately enabled.
 - Discover models available to the authorized ChatGPT account.
 - Answer questions in Assist and retain conversation context through Home Assistant's chat log.
 - Read live home information and control exposed entities when you enable device access: for example lights, supported thermostat settings, and exposed scenes/scripts.
@@ -13,7 +14,7 @@ A custom conversation integration that signs in with your **ChatGPT account** an
 - Renew tokens with serialized, atomic storage of rotating refresh tokens; provide reauthentication when a session is revoked.
 - Bound each request to 8 sequential tool calls and 180 seconds. Validate tool names, namespaces, argument schemas and duplicate call IDs before executing a response.
 
-It does **not** edit YAML, create automations, install integrations, run arbitrary services, or execute shell commands. Supported updates are the actions provided by Assist. To perform a specific broader action, create and review a narrow script yourself, then expose that script. Its effects become available to the assistant.
+Optional [configuration administration](docs/ADMINISTRATION.md) can inspect and draft changes to explicitly allowed UI-managed automations and existing storage dashboards. Each change requires administrator review in Configure, with validation, conflict checks and a saved backup. This includes creating automations under IDs you explicitly allow. Package/YAML dashboard editing, integration installation, arbitrary services and shell access are unsupported.
 
 ## Why sign-in uses a helper
 
@@ -44,7 +45,7 @@ See [Security model](SECURITY.md). Your questions, conversation context and Assi
 
 Tokens are sensitive secrets. The helper writes owner-only files on Unix and protected files accessible to the current account on Windows NTFS. HA stores initial credentials in its normal config-entry storage and renewed credentials in a dedicated atomic `.storage` record, **not an encrypted vault**. Secure your HA host and backups, access the UI over HTTPS, and revoke the app in ChatGPT Settings if credentials leak. Do not turn on broad HTTP/debug logging or include credential files in bug reports.
 
-A model can misunderstand requests or follow malicious device text. Exposure is the primary permission boundary. Avoid exposing door locks, alarms and powerful scripts until you have assessed the consequences. There is no per-action confirmation UI or separate read-only home-access mode. With device access disabled, the agent receives neither Assist tools nor Assist's home-state context.
+A model can misunderstand requests or follow malicious device text. Exposure is the primary permission boundary. Avoid exposing door locks, alarms and powerful scripts until you have assessed the consequences. Assist device actions have no per-action confirmation UI or separate read-only mode. Configuration edits use a separate mandatory review form. With both device and configuration access disabled, the agent receives neither Assist tools nor Assist's home-state context.
 
 A timeout or failure after a successful earlier tool call cannot roll that action back. Check the device state before repeating a command. The integration performs no automatic inference retries.
 

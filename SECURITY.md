@@ -27,3 +27,13 @@ The provider still sees request data despite `store=false`. Your HA logging/trac
 ## Reporting
 
 Report security problems privately to the repository maintainer once this project has a published repository and contact channel. No reporting address is configured in this local initial release. Never include live tokens, full credentials or private home data. If credentials are exposed, disconnect the app in ChatGPT Settings and replace the local session.
+
+## Configuration administration
+
+Disabled by default, with separate exact-target allowlists for automation IDs and storage dashboard paths. With administration enabled, the conversation agent also checks administrator identity before sending any conversation history to the model. After disabling administration, conversations containing configuration tool results must be replaced with a new conversation. Every model configuration tool checks the original requesting HA user's active administrator status; missing and system-generated identities are denied. Tools are scoped to this account's conversation agent and are not globally registered with Assist or MCP. The only model write tool persists a draft; no model tool, service or chat confirmation can apply or approve it.
+
+Approval/restoration happens through HA's options-flow endpoints, which require an authenticated administrator on both flow creation and submission. The server applies its saved proposal after checking author permissions, current allowlists, expiry, content hashes, current target configuration and validation. A different administrator may review a draft, but the original author must still have active administrator access. Proposals cannot alter their automation ID. Blueprints, YAML dashboards, secret/include resolution, dashboard resource installation and arbitrary file paths are excluded.
+
+Backups are persisted before live writes. Interrupted/failed writes are not automatically retried. Restoration requires review and an unchanged applied target; later edits block it. The bounded private HA storage record contains configuration and author IDs, not credentials. Private storage is not encryption. Native/external editors do not share this integration's lock, so avoid concurrent editing during application. Structural dashboard validation cannot certify arbitrary custom cards. Automation actions may invoke powerful existing services/scripts: approval grants those effects, so review every action.
+
+Selected configurations, drafts and tool arguments may be sent to OpenAI and recorded by HA traces. Protect backups and avoid literal credentials in allowed configuration. See [administration guide](docs/ADMINISTRATION.md) for supported scope and recovery.

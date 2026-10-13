@@ -8,6 +8,7 @@ from uuid import uuid4
 from homeassistant.config_entries import ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.http import current_request
 from homeassistant.helpers.selector import (
     BooleanSelector,
     SelectSelector,
@@ -18,6 +19,7 @@ from homeassistant.helpers.selector import (
 )
 from homeassistant.helpers.storage import Store
 
+from .administration import AdministrationError
 from .api import ModelError, available_models
 from .auth import AuthError, ConnectionError, validate_import
 from .compat import schema as vol
@@ -110,9 +112,77 @@ class ChatGPTFlow(ConfigFlow, domain=DOMAIN):
 
 
 class ChatGPTOptionsFlow(OptionsFlow):
-    """Only built-in Assist can be granted; no arbitrary service APIs."""
+    """Review is protected by HA's authenticated administrator options endpoints."""
 
     async def async_step_init(self, user_input=None):
+        return self.async_show_menu(step_id="init", menu_options=["settings", "review"])
+
+    async def async_step_review(self, user_input=None):
+        manager = self.config_entry.runtime_data.administration
+        if user_input is not None:
+            self.proposal_id = user_input["proposal_id"]
+            self.rollback = user_input.get("rollback", False)
+            return await self.async_step_confirm()
+        options = [
+            {"value": key, "label": f"{r['kind']} {r['target']} ({r['status']}) · {key}"}
+            for key, r in manager.records.items()
+        ]
+        if not options:
+            return self.async_abort(reason="no_proposals")
+        return self.async_show_form(
+            step_id="review",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("proposal_id"): SelectSelector(SelectSelectorConfig(options=options)),
+                    vol.Required("rollback", default=False): BooleanSelector(),
+                }
+            ),
+        )
+
+    async def async_step_confirm(self, user_input=None):
+        manager = self.config_entry.runtime_data.administration
+        errors = {}
+        if user_input is not None and user_input.get("approve"):
+            try:
+                request = current_request.get()
+                reviewer = request.get("hass_user") if request is not None else None
+                if not reviewer or not reviewer.is_admin:
+                    raise AdministrationError(
+                        "Approval requires the authenticated administrator settings UI."
+                    )
+                await manager.apply_from_options(
+                    self.proposal_id, reviewer_id=reviewer.id, rollback=self.rollback
+                )
+            except AdministrationError as err:
+                errors["base"] = "administration_failed"
+                self.failure = str(err)
+            except Exception:
+                errors["base"] = "administration_failed"
+                self.failure = "Validation or storage failed. Check the configuration before retrying."
+            else:
+                return self.async_abort(
+                    reason="configuration_restored" if self.rollback else "configuration_applied"
+                )
+        try:
+            preview = manager.review(self.proposal_id, rollback=self.rollback)
+        except AdministrationError:
+            return self.async_abort(reason="no_proposals")
+        return self.async_show_form(
+            step_id="confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("approve", default=False): BooleanSelector(),
+                }
+            ),
+            errors=errors,
+            description_placeholders={
+                "preview": preview,
+                "operation": "Restore saved backup" if self.rollback else "Apply proposed configuration",
+                "failure": getattr(self, "failure", ""),
+            },
+        )
+
+    async def async_step_settings(self, user_input=None):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
         errors = {}
@@ -125,7 +195,7 @@ class ChatGPTOptionsFlow(OptionsFlow):
                 {"value": self.config_entry.options["model"], "label": self.config_entry.options["model"]}
             ]
         return self.async_show_form(
-            step_id="init",
+            step_id="settings",
             data_schema=vol.Schema(
                 {
                     vol.Required("model", default=self.config_entry.options["model"]): SelectSelector(
@@ -134,6 +204,15 @@ class ChatGPTOptionsFlow(OptionsFlow):
                     vol.Required(
                         "control", default=self.config_entry.options.get("control", False)
                     ): BooleanSelector(),
+                    vol.Required(
+                        "administration", default=self.config_entry.options.get("administration", False)
+                    ): BooleanSelector(),
+                    vol.Required(
+                        "automation_ids", default=self.config_entry.options.get("automation_ids", "")
+                    ): TextSelector(),
+                    vol.Required(
+                        "dashboard_paths", default=self.config_entry.options.get("dashboard_paths", "")
+                    ): TextSelector(),
                 }
             ),
             errors=errors,

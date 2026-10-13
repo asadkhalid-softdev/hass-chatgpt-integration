@@ -11,6 +11,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import intent, llm
 
 from . import ChatGPTConfigEntry
+from .administration import AdministrationError, ConfigurationAPI
 from .api import ModelError, response
 from .auth import AuthError, ConnectionError
 from .compat import schema as vol
@@ -139,9 +140,28 @@ class ChatGPTConversation(conversation.ConversationEntity):
                 )
 
     async def _handle(self, user_input, chat_log):
+        # Permission changes must not turn an administration log into a household chat.
+        if not self.entry.options.get("administration") and any(
+            isinstance(item, conversation.ToolResultContent) and item.tool_name.startswith("configuration_")
+            for item in chat_log.content
+        ):
+            return self._error(
+                user_input, chat_log, "Start a new conversation after disabling configuration administration."
+            )
+        if self.entry.options.get("administration"):
+            try:
+                await self.entry.runtime_data.administration.authorize(user_input.context.user_id)
+            except AdministrationError as err:
+                return self._error(user_input, chat_log, str(err))
         await chat_log.async_provide_llm_data(
             user_input.as_llm_context(DOMAIN),
-            [llm.LLM_API_ASSIST] if self.entry.options.get("control") else None,
+            (
+                ConfigurationAPI(self.hass, self.entry)
+                if self.entry.options.get("administration")
+                else [llm.LLM_API_ASSIST]
+                if self.entry.options.get("control")
+                else None
+            ),
             DEFAULT_PROMPT,
             user_input.extra_system_prompt,
         )
@@ -152,7 +172,7 @@ class ChatGPTConversation(conversation.ConversationEntity):
                 {
                     "type": "namespace",
                     "name": NAMESPACE,
-                    "description": "Home Assistant exposed-entity state and control tools.",
+                    "description": "Home Assistant device tools and administrator configuration drafts.",
                     "tools": [
                         {
                             "type": "function",

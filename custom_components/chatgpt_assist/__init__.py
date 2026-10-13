@@ -13,6 +13,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 
+from .administration import Administration
 from .auth import AuthError, ConnectionError, request_json, token_record
 from .const import API_URL, DOMAIN, TOKEN_URL
 
@@ -28,6 +29,7 @@ class Account:
         self.session = async_get_clientsession(hass)
         self.lock = asyncio.Lock()
         self.options = dict(entry.options)
+        self.administration = Administration(hass, entry)
         self.store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.tokens")
         self.tokens = dict(entry.data)
 
@@ -84,6 +86,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ChatGPTConfigEntry) -> b
     entry.runtime_data = Account(hass, entry)
     try:
         await entry.runtime_data.load()
+        await entry.runtime_data.administration.load()
         await entry.runtime_data.access_token()
     except ConnectionError as err:
         raise ConfigEntryNotReady(str(err)) from None
@@ -110,6 +113,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ChatGPTConfigEntry) -> 
     saved = await store.async_load()
     data = saved if saved and saved.get("expires_at", 0) > entry.data["expires_at"] else entry.data
     await store.async_remove()
+    await Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.administration", private=True).async_remove()
     try:
         discovery = await request_json(
             session, "GET", "https://auth.openai.com/.well-known/openid-configuration"

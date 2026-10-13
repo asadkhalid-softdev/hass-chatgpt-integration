@@ -31,17 +31,48 @@
   },
   "options": {
     "step": {
-      "init": {
+      "settings": {
         "title": "ChatGPT Assist options",
-        "description": "Device control grants the built-in Assist API access to exposed entities. Review Settings \u2192 Voice assistants \u2192 Expose before enabling. Exposed scripts can have broader effects.",
+        "description": "Device control grants the built-in Assist API access to exposed entities. Review Settings → Voice assistants → Expose before enabling. Exposed scripts can have broader effects. Configuration administration is separate, disabled by default, and restricted to authenticated administrators. Grant exact targets as comma-separated lists. Review changes before applying.",
         "data": {
           "model": "ChatGPT model",
-          "control": "Allow reading and controlling exposed entities"
+          "control": "Allow reading and controlling exposed entities",
+          "administration": "Enable configuration inspection and drafts (administrators only)",
+          "automation_ids": "Allowed automation configuration IDs (comma separated; new IDs allow creation)",
+          "dashboard_paths": "Allowed existing storage dashboard URL paths (comma separated; <default> for the legacy default)"
+        }
+      },
+      "init": {
+        "title": "ChatGPT Assist",
+        "menu_options": {
+          "settings": "Model and permissions",
+          "review": "Review changes"
+        }
+      },
+      "review": {
+        "title": "Select a configuration proposal",
+        "description": "Select a draft to review, or select an applied/failed proposal and enable Restore to review its saved backup. Drafts expire after 30 minutes. Applying changes can affect your home.",
+        "data": {
+          "proposal_id": "Proposal",
+          "rollback": "Restore saved backup instead of applying the draft"
+        }
+      },
+      "confirm": {
+        "title": "Review configuration changes",
+        "description": "{operation}\n\n{preview}\n\nFor restoration, the changes shown will be reversed. Review all triggers, conditions, actions, and dashboard settings. Approval applies the complete configuration shown.\n\n{failure}",
+        "data": {
+          "approve": "I have reviewed the configuration and approve this operation"
         }
       }
     },
     "error": {
-      "cannot_connect": "Could not refresh the account model list. The existing model is shown."
+      "cannot_connect": "Could not refresh the account model list. The existing model is shown.",
+      "administration_failed": "The operation could not be completed. See the explanation above."
+    },
+    "abort": {
+      "no_proposals": "No saved proposals are available. Ask the assistant to prepare a configuration change first.",
+      "configuration_applied": "Configuration applied. Automations were reloaded if applicable.",
+      "configuration_restored": "Saved configuration restored."
     }
   }
 }

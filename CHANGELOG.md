@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+- Add opt-in administrator configuration tools for exact allowed automation IDs and storage dashboard paths. Read full saved definitions, validate replacement drafts, and report proposal status.
+- Add native Configure review/approval and restoration forms. Chat tools cannot approve or apply changes. Proposals expire in 30 minutes, enforce active administrator permissions and conflict checks, and save bounded private backups before writing.
+- Support creating UI-managed automations under preauthorized IDs, atomic automation saves/reloads, and existing dashboard view/card updates through HA storage. Document unsupported blueprint/YAML/dashboard-registration operations and concurrency limits.
+- Add real HA configuration validation, storage, review-flow, permission, failure and restoration tests for both supported Core versions.
+
 ## 0.1.6
 
 - Surface sanitized provider failure codes and request-parameter roots for failed/incomplete streams and bounded HTTP error responses. Distinguish app/plan limits, eligibility, unsupported capabilities, model availability and temporary service failures.

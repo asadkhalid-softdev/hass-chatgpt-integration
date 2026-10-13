@@ -133,3 +133,7 @@ Remove the integration entry to delete local config credentials and its rotated-
 | OAuth localhost callback cannot connect | Run the helper on your browser's computer; check local firewall/WSL forwarding. |
 
 Diagnostics include only model choice, access enabled, version and host ID. Do not share account files, `.storage` contents, HTTP traces or raw conversation logs.
+
+## Automation and dashboard configuration
+
+After installation, follow the [configuration administration guide](ADMINISTRATION.md) to enable exact targets, inspect automation triggers, prepare changes, and approve or restore them in Configure. Device control and configuration administration are separate permissions; configuration access starts disabled.
