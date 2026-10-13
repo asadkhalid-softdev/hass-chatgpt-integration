@@ -5,13 +5,13 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-import voluptuous as vol
 from homeassistant.components import conversation
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.helpers import llm
 
 from custom_components.chatgpt_assist import conversation as agent
 from custom_components.chatgpt_assist.api import ModelError
+from custom_components.chatgpt_assist.compat import schema as vol
 from custom_components.chatgpt_assist.const import NAMESPACE
 
 
@@ -56,7 +56,14 @@ def test_history_preserves_reasoning_namespace_and_results():
             conversation.UserContent(content="turn on kitchen"),
             conversation.AssistantContent(agent_id="test", native={"output": output}),
             conversation.ToolResultContent(
-                agent_id="test", tool_name="set_light", tool_call_id="call1", tool_result={"success": True}
+                agent_id="test",
+                tool_name="set_light",
+                tool_call_id="call1",
+                **(
+                    {"result": llm.ToolResult(data={"success": True})}
+                    if hasattr(llm, "ToolResult")
+                    else {"tool_result": {"success": True}}
+                ),
             ),
         ]
     )
@@ -89,11 +96,13 @@ async def test_real_chat_log_tools_and_multi_turn(tmp_path, monkeypatch):
 
     class SetLight(llm.Tool):
         name = "set_light"
+        integration = "chatgpt_assist"
         parameters = vol.Schema({vol.Required("entity_id"): str})
 
         async def async_call(self, hass, tool_input, llm_context):
             dispatched.append((tool_input.tool_args, llm_context.context.user_id))
-            return {"success": True}
+            data = {"success": True}
+            return llm.ToolResult(data=data) if hasattr(llm, "ToolResult") else data
 
     class API(llm.API):
         async def async_get_api_instance(self, context):
@@ -104,6 +113,7 @@ async def test_real_chat_log_tools_and_multi_turn(tmp_path, monkeypatch):
         api_prompt="",
         llm_context=user.as_llm_context("chatgpt_assist"),
         tools=[SetLight()],
+        custom_serializer=llm.selector_serializer,
     )
     log = conversation.ChatLog(hass, "test")
     log.async_add_user_content(conversation.UserContent(content=user.text))
@@ -122,6 +132,9 @@ async def test_real_chat_log_tools_and_multi_turn(tmp_path, monkeypatch):
         assert dispatched == [({"entity_id": "light.kitchen"}, "original-user")]
         assert responses.call_args.args[3][-1]["type"] == "function_call_output"
         assert responses.call_args.args[4][0]["type"] == "namespace"
+        # The real Assist serializer must not leave a probatio UNSUPPORTED sentinel.
+        json.dumps(responses.call_args.args[4])
+        assert responses.call_args.args[4][0]["tools"][0]["parameters"]["type"] == "object"
     finally:
         await hass.async_stop()
 

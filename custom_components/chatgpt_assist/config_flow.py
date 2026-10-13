@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from uuid import uuid4
 
-import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -21,6 +20,7 @@ from homeassistant.helpers.storage import Store
 
 from .api import ModelError, available_models
 from .auth import AuthError, ConnectionError, validate_import
+from .compat import schema as vol
 from .const import DOMAIN
 
 CREDENTIAL_SCHEMA = vol.Schema(

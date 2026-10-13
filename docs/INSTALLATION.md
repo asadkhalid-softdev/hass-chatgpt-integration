@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Home Assistant Core 2026.3.4 is the tested baseline; Python 3.14 is provided by that HA runtime. Later releases need compatibility verification.
+- Home Assistant Core 2026.3.4 and 2026.10.1 are tested with Python 3.14. Other releases need compatibility verification.
 - Administrator access to HA and its configuration directory.
 - An eligible ChatGPT account/workspace that allows OSS plan sharing. Approval and model availability come from OpenAI; the integration cannot enable them.
 - Python 3.12 or newer, or `uv`, on your Windows, Linux or macOS browser computer. The helper uses Unix private-file permissions or a protected Windows NTFS ACL. It does not need a Home Assistant access token.
@@ -129,7 +129,7 @@ Remove the integration entry to delete local config credentials and its rotated-
 | Usage limit or incomplete response | Review ChatGPT Usage. Check device state before retrying; earlier actions may already have run. |
 | Assistant cannot see a device | Enable home access, expose the entity, assign appropriate names/areas, and check Assist supports its intent. |
 | Integration absent | Check `/config/custom_components/chatgpt_assist/manifest.json`, HA version, dependencies and restart. |
-| New HA version breaks tool schemas | Use the verified baseline or adapt/test the integration against that version. |
+| `_Unsupported` serialization error with home access enabled | Update to 0.1.4 or newer through HACS, restart HA, and start a new Assist conversation. |
 | OAuth localhost callback cannot connect | Run the helper on your browser's computer; check local firewall/WSL forwarding. |
 
 Diagnostics include only model choice, access enabled, version and host ID. Do not share account files, `.storage` contents, HTTP traces or raw conversation logs.

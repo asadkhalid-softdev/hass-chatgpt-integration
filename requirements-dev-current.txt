@@ -1,0 +1,7 @@
+homeassistant==2026.10.1
+pytest>=8,<10
+pytest-asyncio>=1,<2
+ruff>=0.14,<1
+gazetteer-matcher==1.1.0
+hassil==3.12.1
+home-assistant-intents==2026.10.6

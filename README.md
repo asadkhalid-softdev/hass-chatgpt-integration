@@ -2,7 +2,7 @@
 
 A custom conversation integration that signs in with your **ChatGPT account** and uses eligible account models in Home Assistant Assist. Device access is opt-in and uses Home Assistant's built-in Assist API.
 
-**Status:** initial release, tested against Home Assistant Core **2026.3.4**, Python **3.14**. OAuth and inference follow the documented OpenAI OSS preview. Live ChatGPT sign-in, subscription eligibility and a real home installation still require your verification. Newer Home Assistant versions have not been verified. This is an independent project, not an official OpenAI or Home Assistant integration.
+**Status:** initial release, tested against Home Assistant Core **2026.3.4** and **2026.10.1**, Python **3.14**. OAuth and inference follow the documented OpenAI OSS preview. Live ChatGPT sign-in, subscription eligibility and a real home installation still require your verification. Other Home Assistant versions have not been verified. This is an independent project, not an official OpenAI or Home Assistant integration.
 
 ## What it does
 
@@ -58,7 +58,7 @@ uv pip install --python .venv/bin/python -r requirements-dev.txt
 .venv/bin/ruff format --check custom_components scripts tests
 ```
 
-Tests verify OAuth rejection paths, signed JWT validation, grant permissions, import identity, refresh serialization, protected files, failed/incomplete SSE streams, protocol limits and real HA chat-log dispatch with the original user context. Network responses are mocked; this is not a live-account certification. [Live verification checklist](docs/INSTALLATION.md#verify-your-installation) covers installation and exposure checks.
+CI tests both Core versions; `requirements-dev-current.txt` provides the 2026.10.1 test environment. Tests verify OAuth rejection paths, signed JWT validation, grant permissions, import identity, refresh serialization, protected files, failed/incomplete SSE streams, protocol limits and real HA chat-log dispatch with the original user context. Network responses are mocked; this is not a live-account certification. [Live verification checklist](docs/INSTALLATION.md#verify-your-installation) covers installation and exposure checks.
 
 ## Research sources
 

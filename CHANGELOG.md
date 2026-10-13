@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4
+
+- Fix requests failing with `TypeError: Object of type _Unsupported is not JSON serializable` when Assist's probatio schemas were passed to the legacy voluptuous converter.
+- Match Core's schema library for config forms and tool conversion, and use the current tool-result interface when available. Keep support for the older voluptuous-based Core API.
+- Test the real Assist serializer, selectors and conversation tool-result handling against Core 2026.3.4 and 2026.10.1. CI checks both releases.
+
 ## 0.1.3
 
 - Allow a fixed 30-second JWT clock-skew tolerance for minor differences in issuance, not-before and expiry timestamps. Signature, issuer, audience, required claims and nonce checks remain mandatory; tokens outside the timing tolerance are rejected.

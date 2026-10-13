@@ -5,15 +5,15 @@ from __future__ import annotations
 import asyncio
 import json
 
-import voluptuous as vol
 from homeassistant.components import conversation
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import intent, llm
-from voluptuous_openapi import convert
 
 from . import ChatGPTConfigEntry
 from .api import ModelError, response
 from .auth import AuthError, ConnectionError
+from .compat import schema as vol
+from .compat import schema_to_json
 from .const import DEFAULT_PROMPT, DOMAIN, MAX_ROUNDS, MAX_TOOL_CALLS, NAMESPACE
 
 
@@ -27,11 +27,17 @@ def inputs_from_log(chat_log) -> list[dict]:
     result = []
     for item in chat_log.content:
         if isinstance(item, conversation.ToolResultContent):
+            if hasattr(item, "result"):
+                data = item.result.data
+                if item.result.error:
+                    data = {"error": True, "data": data}
+            else:
+                data = item.tool_result
             result.append(
                 {
                     "type": "function_call_output",
                     "call_id": item.tool_call_id,
-                    "output": json.dumps(item.tool_result),
+                    "output": json.dumps(data),
                 }
             )
         elif isinstance(item, conversation.AssistantContent) and isinstance(item.native, dict):
@@ -142,7 +148,7 @@ class ChatGPTConversation(conversation.ConversationEntity):
                             "name": tool.name,
                             "description": tool.description or tool.name,
                             "strict": False,
-                            "parameters": convert(
+                            "parameters": schema_to_json(
                                 tool.parameters, custom_serializer=chat_log.llm_api.custom_serializer
                             ),
                         }
