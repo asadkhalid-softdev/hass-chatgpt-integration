@@ -10,7 +10,7 @@ Only Home Assistant's built-in Assist API is offered to the model. Available nam
 
 ## Credential lifecycle
 
-On Unix, helper files are atomically written with mode 0600; new directories use 0700. The helper requires Unix semantics. An existing parent directory's permissions are the user's responsibility. Retained credentials allow later authorization of the same registration; the helper never refreshes the HA session.
+On Unix, helper files are atomically written with mode 0600; new directories use 0700. On Windows, the helper applies a protected DACL containing only the current account before writing any credential content, checks the resulting ACL, then atomically replaces the destination file. Failure to set or verify the ACL stops the write. This requires NTFS and the helper-only pywin32 dependency. An existing parent directory's permissions are the user's responsibility. Retained credentials allow later authorization of the same registration; the helper never refreshes the HA session.
 
 HA config-entry storage holds the imported grant. A dedicated HA Store holds the latest rotated grant with immediate atomic writes. Runtime loads the newest matching registration at startup. One lock serializes refreshes per entry. The new rotating grant is saved before use; duplicate registrations are rejected through unique IDs. Reauthentication preserves HA's opaque host ID. Removal revokes the current refresh token if possible, deletes the rotated store and warns through a persistent notification if remote revocation was not confirmed.
 

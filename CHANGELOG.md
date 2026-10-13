@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Support native PowerShell/Windows sign-in with protected NTFS credential-file ACLs; test successful writes and fail-closed permission errors on native Windows.
+- Declare helper dependencies using inline script metadata and document one-line `uv run --script` commands, avoiding project discovery and Bash line-continuation errors in PowerShell.
+
 ## 0.1.1
 
 - Remove integration dependency pins for libraries already supplied by Home Assistant. The `PyJWT[crypto]==2.10.1` requirement could fail installation and prevent the config flow from loading.

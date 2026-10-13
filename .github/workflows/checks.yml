@@ -16,3 +16,13 @@ jobs:
       - run: ruff check custom_components scripts tests
       - run: ruff format --check custom_components scripts tests
       - run: pytest -q
+  windows-helper:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r scripts/requirements.txt pytest pytest-asyncio
+      - run: python -m pytest -q tests/test_login_storage.py
+      - run: python scripts/chatgpt_login.py --help

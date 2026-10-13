@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "aiohttp>=3.13.3,<4",
+#     "PyJWT[crypto]==2.10.1",
+#     "pywin32==312; sys_platform == 'win32'",
+# ]
+# ///
 """Complete documented ChatGPT OSS OAuth in a local browser, without HA secrets."""
 
 from __future__ import annotations
@@ -33,13 +41,59 @@ spec.loader.exec_module(module)
 from _chatgpt_oauth.auth import AuthError, ConnectionError, exchange, new_attempt  # noqa: E402
 
 
+def _protect_windows_file(path: str) -> None:
+    """Remove inherited access and grant only the current Windows account access."""
+    try:
+        import ntsecuritycon
+        import pywintypes
+        import win32api
+        import win32con
+        import win32security
+    except ImportError:
+        raise OSError("Windows credential protection requires pywin32. Run this helper with uv.") from None
+    try:
+        token = win32security.OpenProcessToken(win32api.GetCurrentProcess(), win32con.TOKEN_QUERY)
+        try:
+            sid = win32security.GetTokenInformation(token, win32security.TokenUser)[0]
+        finally:
+            token.Close()
+        dacl = win32security.ACL()
+        dacl.AddAccessAllowedAce(win32security.ACL_REVISION, ntsecuritycon.FILE_ALL_ACCESS, sid)
+        win32security.SetNamedSecurityInfo(
+            path,
+            win32security.SE_FILE_OBJECT,
+            win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
+            None,
+            None,
+            dacl,
+            None,
+        )
+        security = win32security.GetNamedSecurityInfo(
+            path, win32security.SE_FILE_OBJECT, win32security.DACL_SECURITY_INFORMATION
+        )
+        actual = security.GetSecurityDescriptorDacl()
+        control = security.GetSecurityDescriptorControl()[0]
+        if (
+            not control & win32security.SE_DACL_PROTECTED
+            or actual is None
+            or actual.GetAceCount() != 1
+            or actual.GetAce(0)[2] != sid
+        ):
+            raise OSError("Windows did not enforce private credential permissions.")
+    except pywintypes.error:
+        raise OSError("Could not protect credentials. Use a private folder on an NTFS drive.") from None
+
+
 def atomic_private_write(path: Path, data: dict) -> None:
-    """Avoid partial writes, symlink following, and permissive Unix credential files."""
+    """Write credentials atomically, protecting the empty file before writing secrets."""
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     fd, temporary = tempfile.mkstemp(prefix=".chatgpt-", dir=path.parent)
     try:
-        os.fchmod(fd, 0o600)
         with os.fdopen(fd, "w") as stream:
+            if os.name == "nt":
+                _protect_windows_file(temporary)
+            else:
+                os.fchmod(stream.fileno(), 0o600)
             json.dump(data, stream, indent=2)
             stream.write("\n")
             stream.flush()
@@ -134,8 +188,6 @@ def main():
         "--no-browser", action="store_true", help="Print the authorization URL for manual opening"
     )
     args = parser.parse_args()
-    if os.name != "posix":
-        parser.exit(1, "This helper requires Unix private-file permissions. Run it on Linux, macOS or WSL.\n")
     try:
         asyncio.run(login(args))
     except (AuthError, ConnectionError) as err:
@@ -145,7 +197,10 @@ def main():
     except KeyboardInterrupt:
         parser.exit(1, "Sign-in cancelled.\n")
     except (ValueError, OSError, KeyError):
-        parser.exit(1, "Could not read or save local credentials. Check the output path and permissions.\n")
+        parser.exit(
+            1,
+            "Could not read or save protected credentials. Check permissions and use a local NTFS folder on Windows.\n",
+        )
 
 
 if __name__ == "__main__":

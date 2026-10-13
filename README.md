@@ -26,12 +26,10 @@ There is no client secret to obtain, no borrowed Codex client ID, no ChatGPT bro
 Full instructions: [Installation guide](docs/INSTALLATION.md).
 
 1. Copy `custom_components/chatgpt_assist` into your HA configuration's `custom_components/` directory, then restart HA.
-2. On your browser's computer, install Python 3.14 and run the sign-in helper:
+2. On your browser's computer, run this single line in PowerShell or Bash with `uv` installed. The helper manages its own dependencies:
 
-   ```bash
-   python3.14 -m venv .login-venv
-   .login-venv/bin/python -m pip install -r scripts/requirements.txt
-   .login-venv/bin/python scripts/chatgpt_login.py
+   ```text
+   uv run --python 3.12 --script scripts/chatgpt_login.py
    ```
 
 3. Open HA over HTTPS → **Settings → Devices & services → Add integration → ChatGPT Assist**. Paste the protected JSON credential file, then choose a model.
@@ -44,7 +42,7 @@ You can add multiple account/workspace registrations by using separate helper ou
 
 See [Security model](SECURITY.md). Your questions, conversation context and Assist's exposed home context are sent to OpenAI. `store=false` avoids Responses application storage; it does not promise zero provider retention. This flow grants no access to your ChatGPT chat history. Home Assistant owns its chat logs and storage policies.
 
-Tokens are sensitive secrets. The helper writes owner-only files on Unix. HA stores initial credentials in its normal config-entry storage and renewed credentials in a dedicated atomic `.storage` record, **not an encrypted vault**. Secure your HA host and backups, access the UI over HTTPS, and revoke the app in ChatGPT Settings if credentials leak. Do not turn on broad HTTP/debug logging or include credential files in bug reports.
+Tokens are sensitive secrets. The helper writes owner-only files on Unix and protected files accessible to the current account on Windows NTFS. HA stores initial credentials in its normal config-entry storage and renewed credentials in a dedicated atomic `.storage` record, **not an encrypted vault**. Secure your HA host and backups, access the UI over HTTPS, and revoke the app in ChatGPT Settings if credentials leak. Do not turn on broad HTTP/debug logging or include credential files in bug reports.
 
 A model can misunderstand requests or follow malicious device text. Exposure is the primary permission boundary. Avoid exposing door locks, alarms and powerful scripts until you have assessed the consequences. There is no per-action confirmation UI or separate read-only home-access mode. With device access disabled, the agent receives neither Assist tools nor Assist's home-state context.
 

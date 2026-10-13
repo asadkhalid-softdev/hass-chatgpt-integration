@@ -5,7 +5,7 @@
 - Home Assistant Core 2026.3.4 is the tested baseline; Python 3.14 is provided by that HA runtime. Later releases need compatibility verification.
 - Administrator access to HA and its configuration directory.
 - An eligible ChatGPT account/workspace that allows OSS plan sharing. Approval and model availability come from OpenAI; the integration cannot enable them.
-- Python 3.14 on a Linux/macOS/WSL computer from which you can open a browser. The helper currently requires Unix file permissions. It does not need a Home Assistant access token.
+- Python 3.12 or newer, or `uv`, on your Windows, Linux or macOS browser computer. The helper uses Unix private-file permissions or a protected Windows NTFS ACL. It does not need a Home Assistant access token.
 - Internet access from that computer and HA to `auth.openai.com` and `api.openai.com` over HTTPS, with normal certificate verification.
 - A secure HTTPS connection to your HA UI, such as your existing Home Assistant Cloud connection or correctly configured HTTPS. Do not submit credential JSON through an unencrypted remote HTTP connection.
 
@@ -25,29 +25,33 @@ Restart Home Assistant. No `configuration.yaml` changes are needed. The integrat
 
 Keep the entire repository available on this computer, including `scripts/` and `custom_components/`. The helper shares the integration's OAuth validation code.
 
-```bash
-python3.14 -m venv .login-venv
-.login-venv/bin/python -m pip install -r scripts/requirements.txt
-.login-venv/bin/python scripts/chatgpt_login.py
+With `uv`, run this **single line** from the repository directory. It works in PowerShell and Bash; the script declares its own dependencies and skips project discovery:
+
+```text
+uv run --python 3.12 --script scripts/chatgpt_login.py
 ```
 
-If you use `uv`, this also works:
+The helper supports Python 3.12 or newer. Requesting 3.12 also works with older uv releases whose Python 3.14 downloads may still be prereleases. `uv` downloads the requested Python version if needed. See [uv's script documentation](https://docs.astral.sh/uv/guides/scripts/) for inline dependency handling.
 
-```bash
-uv run --python 3.14 --with 'aiohttp>=3.13.3,<4' --with 'PyJWT[crypto]==2.10.1' scripts/chatgpt_login.py
-```
+If you prefer a virtual environment, install `scripts/requirements.txt` and run `scripts/chatgpt_login.py` with that environment's Python.
 
 A browser opens the OpenAI authorization page. Sign in, select the intended workspace if requested, and authorize the app to use your ChatGPT plan. The page redirects to `http://127.0.0.1:<port>/auth/callback`. Return to the terminal and wait for **Sign-in verified**. The helper has a five-minute timeout and prints no tokens.
 
 If the browser does not open:
 
 ```bash
-.login-venv/bin/python scripts/chatgpt_login.py --no-browser
+uv run --python 3.12 --script scripts/chatgpt_login.py --no-browser
 ```
 
 Open the printed URL in a browser on the **same computer**. In WSL, Windows-to-WSL localhost forwarding must work; if it does not, use a Linux/macOS desktop browser or fix forwarding. Do not run the helper inside the HA server or a remote SSH session unless the browser and callback listener share working loopback networking.
 
-The helper saves:
+On Windows, use a local NTFS folder in your user profile, not a shared/FAT drive. The default account file is `%USERPROFILE%\.config\chatgpt-assist\chatgpt-account.json`. After sign-in, open it in PowerShell with:
+
+```powershell
+notepad "$HOME\.config\chatgpt-assist\chatgpt-account.json"
+```
+
+On Linux/macOS/WSL, the helper saves:
 
 ```text
 ~/.config/chatgpt-assist/chatgpt-account.json
@@ -59,8 +63,7 @@ The account file contains access, refresh and ID tokens. The host file holds a s
 For another account/workspace, use a distinct output path:
 
 ```bash
-.login-venv/bin/python scripts/chatgpt_login.py \
-  --output ~/.config/chatgpt-assist/chatgpt-account-second.json
+uv run --python 3.12 --script scripts/chatgpt_login.py --output ~/.config/chatgpt-assist/chatgpt-account-second.json
 ```
 
 Running against an existing account file reauthorizes its saved registration. To create a different registration, choose a new output path. Never run two sign-in helpers against the same file simultaneously.
@@ -106,9 +109,7 @@ No real device/account verification was performed during development. Complete t
 Use the existing helper account file to reauthorize the **same** registration. Download HA diagnostics to find its nonsecret `host_id`, then use:
 
 ```bash
-.login-venv/bin/python scripts/chatgpt_login.py \
-  --output ~/.config/chatgpt-assist/chatgpt-account.json \
-  --host-id urn:uuid:YOUR_HA_HOST_ID
+uv run --python 3.12 --script scripts/chatgpt_login.py --host-id urn:uuid:YOUR_HA_HOST_ID
 ```
 
 Paste the resulting JSON in HA's reauthentication flow. A different signed account/client is rejected. To switch account/workspace, add a separate registration and integration entry and select its conversation agent. If the original registration file was lost, create a new registration and replace the old HA entry, then disconnect the old app in ChatGPT Settings.
