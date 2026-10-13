@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- Allow a fixed 30-second JWT clock-skew tolerance for minor differences in issuance, not-before and expiry timestamps. Signature, issuer, audience, required claims and nonce checks remain mandatory; tokens outside the timing tolerance are rejected.
+
 ## 0.1.2
 
 - Consume complete OAuth, JWKS and model-list HTTP bodies before parsing JSON, keeping a strict response-size limit. Add real split-response transport tests and safe network/parse error codes.

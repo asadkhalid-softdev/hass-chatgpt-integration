@@ -2,7 +2,7 @@
 
 ## Trust boundaries
 
-The local helper obtains a public-client OAuth grant using random state, OIDC nonce and S256 PKCE. Its HTTP callback binds only to 127.0.0.1, checks Host and state, rejects duplicate query fields and consumes the callback once. Access logs are disabled. ID tokens are verified using OpenAI's fixed HTTPS JWKS endpoint, with RS256, issuer, audience, expiry, required claims and nonce checks. Returning sign-in must retain client ID and signed subject. No OAuth client secret or ChatGPT password is collected.
+The local helper obtains a public-client OAuth grant using random state, OIDC nonce and S256 PKCE. Its HTTP callback binds only to 127.0.0.1, checks Host and state, rejects duplicate query fields and consumes the callback once. Access logs are disabled. ID tokens are verified using OpenAI's fixed HTTPS JWKS endpoint, with RS256, issuer, audience, expiry, required claims and nonce checks. JWT time checks allow a fixed 30-second clock-skew tolerance; larger differences remain errors. Returning sign-in must retain client ID and signed subject. No OAuth client secret or ChatGPT password is collected.
 
 The HA admin config flow imports credentials and checks the access token's signature, resource audience, issuer, expiry, client registration, subject and scopes. Token/JWKS/API endpoints are fixed; HTTP redirects are disabled. The browser helper and HA exchange no unauthenticated network messages. Transfer must use a secure HA UI connection; the integration cannot enforce your reverse proxy's TLS configuration.
 

@@ -197,3 +197,41 @@ async def test_nonce_diagnostic_keeps_nonce_private(monkeypatch):
     with pytest.raises(auth.AuthError, match=r"\[nonce_mismatch\]") as error:
         await auth.verify_jwt(None, "private-token", "client", "private-nonce")
     assert "private-" not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    "claim,offset,accepted",
+    [
+        ("iat", 5, True),
+        ("iat", 20, True),
+        ("iat", 90, False),
+        ("nbf", 5, True),
+        ("nbf", 20, True),
+        ("nbf", 90, False),
+    ],
+)
+async def test_clock_skew_is_bounded(monkeypatch, claim, offset, accepted):
+    private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    jwk = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(private.public_key()))
+    jwk["kid"] = "test"
+    monkeypatch.setattr(auth, "request_json", AsyncMock(return_value={"keys": [jwk]}))
+    now = int(time.time())
+    claims = {
+        "sub": "account",
+        "iss": ISSUER,
+        "aud": "issued",
+        "exp": now + 3600,
+        "iat": now,
+        "nonce": "nonce",
+        claim: now + offset,
+    }
+    token = jwt.encode(claims, private, algorithm="RS256", headers={"kid": "test"})
+    if accepted:
+        assert (await auth.verify_jwt(None, token, "issued", "nonce"))["sub"] == "account"
+        with pytest.raises(auth.AuthError, match=r"\[audience_mismatch\]"):
+            await auth.verify_jwt(None, token, "wrong-client", "nonce")
+        with pytest.raises(auth.AuthError, match=r"\[nonce_mismatch\]"):
+            await auth.verify_jwt(None, token, "issued", "wrong-nonce")
+    else:
+        with pytest.raises(auth.AuthError, match=r"\[not_yet_valid\]"):
+            await auth.verify_jwt(None, token, "issued", "nonce")

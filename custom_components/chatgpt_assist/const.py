@@ -5,6 +5,7 @@ NAME = "ChatGPT Assist"
 ISSUER = "https://auth.openai.com"
 AUTHORIZE_URL = f"{ISSUER}/api/accounts/authorize"
 TOKEN_URL = f"{ISSUER}/api/accounts/oauth/token"
+JWT_CLOCK_SKEW_SECONDS = 30
 JWKS_URL = f"{ISSUER}/.well-known/jwks.json"
 API_URL = "https://api.openai.com/v1"
 SCOPES = "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct"

@@ -18,6 +18,7 @@ from .const import (
     AUTHORIZE_URL,
     ISSUER,
     JWKS_URL,
+    JWT_CLOCK_SKEW_SECONDS,
     NAME,
     REQUIRED_SCOPES,
     SCOPES,
@@ -136,6 +137,7 @@ async def verify_jwt(
             algorithms=["RS256"],
             issuer=ISSUER,
             audience=audience,
+            leeway=JWT_CLOCK_SKEW_SECONDS,
             options={"require": ["exp", "iat", "iss", "aud", "sub"]},
         )
         if nonce is not None and not secrets.compare_digest(str(claims.get("nonce", "")), nonce):
