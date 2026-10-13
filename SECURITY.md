@@ -56,7 +56,7 @@ Request IDs prevent repeated delivery while a message remains retained. The user
 
 The Clear history action removes the selected user/account’s saved messages/context and its active Core chat session. It does not delete independent HA traces, backups, configuration proposals or provider-retained data. Removing an integration entry removes its sidebar histories. Displayed history is bounded to 60 messages/128 KB; native context to 160 KB; at most 100 user/account histories are retained. Message input is bounded to 4,000 characters and displayed replies to 16,000 characters.
 
-Messages are rendered using DOM text nodes; no message HTML, scripts or image embeds are executed. Code blocks are text. Clickable links allow only credential-free HTTP(S), open with `noopener noreferrer`, and never fetch remotely inside HA. Python permission tests and browser tests cover ownership, context reset, injection, key handling, request deduplication, identity changes and mobile layout.
+A pinned, locally bundled Marked lexer parses Markdown into tokens. An allowlisted DOM renderer formats tables, lists, headings and text without interpreting model output as HTML. Entity references alone are decoded, then inserted as text nodes. Renderer nesting/token limits and a plain-text fallback protect malformed responses; no message HTML, scripts or image embeds are executed. Code blocks are text. Clickable links allow only credential-free HTTP(S), open with `noopener noreferrer`, and never fetch remotely inside HA. Python permission tests and browser tests cover ownership, context reset, injection, key handling, request deduplication, identity changes and mobile layout.
 
 ## Sensor history
 

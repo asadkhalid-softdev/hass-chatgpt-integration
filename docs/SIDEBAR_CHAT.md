@@ -19,7 +19,7 @@ The panel uses your existing ChatGPT conversation agent, model and permissions. 
 - IME composition does not send prematurely.
 - A reply indicator appears while the assistant is working. You can draft the next message, but another send and history clearing are blocked until the current reply finishes.
 
-Responses support source links, code blocks, inline code and bold text. Source links open in a separate tab; message HTML and images are treated as text rather than executed or fetched. Use **Copy** to copy an assistant response.
+Version 0.5.2 renders GitHub Flavored Markdown: real tables with headers and aligned columns, headings, nested numbered/bulleted lists, read-only task lists, block quotes, horizontal rules, bold/italic/strikethrough text, inline code, fenced code blocks with language labels, and source links. Wide tables scroll inside the message on mobile and can be focused for keyboard scrolling. This is a local Markdown renderer, not ChatGPT’s proprietary frontend. Mathematical notation, Mermaid diagrams and syntax highlighting are not included. Source links open in a separate tab; message HTML and images are treated as text rather than executed or fetched. Use **Copy** to copy an assistant response.
 
 Internet search is controlled by **Allow internet search** in Configure. Configuration edits still require approval through **Configure → Review changes**; the chat provides a settings/review link for administrators. Sending “approve” does not apply a proposal.
 

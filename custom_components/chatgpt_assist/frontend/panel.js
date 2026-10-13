@@ -1,4 +1,5 @@
 /* ChatGPT Assist sidebar. Local assets only; messages never enter innerHTML. */
+import { marked } from "./vendor/marked.js?v=18.1.1";
 const PANEL_STYLE = `
 :host{display:block;height:100%;height:100dvh;color:var(--primary-text-color,#172033);background:var(--primary-background-color,#f5f7fb);font-family:var(--paper-font-body1_-_font-family,system-ui,sans-serif)}
 *{box-sizing:border-box}button,select,textarea{font:inherit}button{cursor:pointer}button:disabled{cursor:default;opacity:.45}button:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible,a:focus-visible{outline:3px solid var(--primary-color,#4465db);outline-offset:3px}
@@ -10,6 +11,8 @@ details{position:relative}summary{list-style:none}summary::-webkit-details-marke
 .alert{max-width:840px;width:calc(100% - 40px);margin:0 auto 8px;padding:10px 13px;background:var(--card-background-color,#fff);color:var(--error-color,#b42318);border-left:3px solid currentColor;border-radius:7px;font-size:13px;display:flex;align-items:center;gap:10px}.alert button{margin-left:auto;flex-shrink:0;border:0;background:transparent;text-decoration:underline;color:inherit;padding:6px}
 .composer-wrap{flex-shrink:0;max-width:880px;width:100%;padding:0 20px max(14px,env(safe-area-inset-bottom));margin:0 auto}.composer{display:flex;gap:10px;align-items:flex-end;background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#dde2ed);border-radius:16px;padding:10px 12px;box-shadow:0 2px 8px #00006}.composer:focus-within{border-color:var(--primary-color,#4465db)}textarea{resize:none;width:100%;min-height:42px;max-height:150px;border:0;background:transparent;color:inherit;padding:9px 4px;line-height:1.5;outline:none!important}.send{border:0;border-radius:10px;min-height:40px;padding:9px 16px;background:var(--primary-color,#4465db);color:var(--text-primary-color,#fff);font-weight:600}.hint{display:flex;justify-content:space-between;color:var(--secondary-text-color,#667085);font-size:11px;gap:10px;margin:8px 4px 0}.hint a{color:inherit}
 dialog{color:var(--primary-text-color,#172033);background:var(--card-background-color,#fff);border:1px solid var(--divider-color,#dde2ed);border-radius:16px;max-width:430px;width:calc(100% - 32px);padding:24px;box-shadow:0 12px 70px #0004}dialog::backdrop{background:#0006}dialog h2{margin:0 0 12px;font-size:20px}dialog p{line-height:1.6;color:var(--secondary-text-color,#667085)}.dialog-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px}.dialog-actions button{border:0;border-radius:8px;padding:10px 16px;background:var(--secondary-background-color,#eef1f7);color:inherit}.dialog-actions .danger{background:var(--error-color,#b42318);color:#fff}
+
+.markdown{white-space:normal;min-width:0}.markdown p{white-space:normal}.markdown>*:first-child{margin-top:0}.markdown>*:last-child{margin-bottom:0}.markdown h1,.markdown h2,.markdown h3,.markdown h4,.markdown h5,.markdown h6{line-height:1.3;margin:22px 0 10px;font-weight:650}.markdown h1{font-size:1.5em}.markdown h2{font-size:1.3em}.markdown h3{font-size:1.15em}.markdown h4,.markdown h5,.markdown h6{font-size:1em}.markdown ul,.markdown ol{padding-left:26px;margin:12px 0}.markdown li{margin:5px 0}.markdown li.task-item{list-style:none}.markdown li>p{margin:5px 0}.markdown li input[type=checkbox]{margin:0 5px 0 0;accent-color:var(--primary-color,#4465db)}.markdown blockquote{border-left:3px solid var(--primary-color,#4465db);margin:14px 0;padding:2px 0 2px 14px;color:var(--secondary-text-color,#667085)}.markdown hr{border:0;border-top:1px solid var(--divider-color,#dde2ed);margin:20px 0}.code-block{margin:14px 0;min-width:0}.code-block pre{margin:0}.code-language{font-size:11px;color:var(--secondary-text-color,#667085);background:var(--secondary-background-color,#eef1f7);border-bottom:1px solid var(--divider-color,#dde2ed);border-radius:8px 8px 0 0;padding:7px 12px}.code-language+pre{border-radius:0 0 8px 8px}.table-scroll{max-width:100%;overflow-x:auto;margin:16px 0;border:1px solid var(--divider-color,#dde2ed);border-radius:8px;overscroll-behavior-x:contain}.table-scroll:focus-visible{outline:3px solid var(--primary-color,#4465db);outline-offset:3px}.markdown table{border-collapse:collapse;width:100%;font-size:.94em;line-height:1.5}.markdown th,.markdown td{padding:10px 13px;border-bottom:1px solid var(--divider-color,#dde2ed);border-right:1px solid var(--divider-color,#dde2ed);text-align:left;min-width:100px;vertical-align:top;overflow-wrap:normal}.markdown th{background:var(--secondary-background-color,#eef1f7);font-weight:650;white-space:nowrap}.markdown td{white-space:normal}.markdown th:last-child,.markdown td:last-child{border-right:0}.markdown tbody tr:last-child td{border-bottom:0}.markdown tbody tr:nth-child(even){background:var(--secondary-background-color,#eef1f7)}
 [hidden]{display:none!important}@media(max-width:600px){.header{padding:10px 12px}.timeline{padding:20px 12px}.composer-wrap{padding-left:12px;padding-right:12px}.message{max-width:100%}.message.user{max-width:90%}.select-row{padding-left:12px;padding-right:12px}.alert{width:calc(100% - 24px)}.hint{font-size:10px}.heading h1{font-size:17px}}@media(prefers-reduced-motion:reduce){.typing span{animation:none}}
 `;
 
@@ -27,52 +30,102 @@ function safeLink(value) {
   } catch { return null; }
 }
 
-function inlineText(parent, text) {
-  const expression = /\[([^\]\n]+)\]\((?:<([^>\n]+)>|([^\s)]+))\)|`([^`\n]+)`|\*\*([^*\n]+)\*\*/g;
-  let cursor = 0;
-  for (const match of text.matchAll(expression)) {
-    parent.append(document.createTextNode(text.slice(cursor, match.index)));
-    if (match[1]) {
-      const href = safeLink(match[2] || match[3]);
-      if (href) {
-        const link = node("a", match[1]);
-        link.href = href;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        parent.append(link);
-      } else parent.append(document.createTextNode(match[0]));
-    } else parent.append(node(match[4] ? "code" : "strong", match[4] || match[5]));
-    cursor = match.index + match[0].length;
+// Decode entity references only, never parse a message or markup as HTML.
+function decodeEntities(text) {
+  return text.replace(/&(?:#[0-9]{1,8}|#x[0-9a-f]{1,6}|[a-z][a-z0-9]{1,31});/gi,
+    (entity) => new DOMParser().parseFromString(entity, "text/html").body.textContent);
+}
+
+function renderTokens(parent, tokens, context, depth = 0) {
+  for (const token of tokens || []) {
+    if (++context.count > 6000 || depth > 32) {
+      parent.append(document.createTextNode(token.raw || token.text || ""));
+      continue;
+    }
+    const children = (element) => renderTokens(element, token.tokens, context, depth + 1);
+    switch (token.type) {
+      case "space": break;
+      case "text":
+        if (token.tokens) children(parent);
+        else parent.append(document.createTextNode(decodeEntities(token.text || "")));
+        break;
+      case "escape": parent.append(document.createTextNode(token.text)); break;
+      case "paragraph": {
+        const paragraph = node("p"); children(paragraph); parent.append(paragraph); break;
+      }
+      case "heading": {
+        const heading = node(`h${Math.min(6, Math.max(1, token.depth))}`);
+        children(heading); parent.append(heading); break;
+      }
+      case "strong": case "em": case "del": {
+        const element = node(token.type); children(element); parent.append(element); break;
+      }
+      case "codespan": parent.append(node("code", token.text)); break;
+      case "br": parent.append(node("br")); break;
+      case "hr": parent.append(node("hr")); break;
+      case "checkbox": {
+        const check = node("input"); check.type = "checkbox"; check.disabled = true; check.checked = token.checked;
+        check.setAttribute("aria-label", token.checked ? "Completed task" : "Incomplete task");
+        parent.append(check, document.createTextNode(" ")); break;
+      }
+      case "code": {
+        const block = node("div", undefined, "code-block");
+        if (token.lang) block.append(node("div", token.lang.split(/\s/)[0].slice(0, 64), "code-language"));
+        const pre = node("pre"); pre.append(node("code", token.text)); block.append(pre);
+        parent.append(block); break;
+      }
+      case "blockquote": {
+        const quote = node("blockquote"); children(quote); parent.append(quote); break;
+      }
+      case "list": {
+        const list = node(token.ordered ? "ol" : "ul");
+        if (token.ordered && Number.isSafeInteger(token.start) && token.start > 0) list.start = token.start;
+        for (const item of token.items) {
+          const li = node("li");
+          if (item.task) li.className = "task-item";
+          renderTokens(li, item.tokens, context, depth + 1); list.append(li);
+        }
+        parent.append(list); break;
+      }
+      case "link": {
+        const href = safeLink(decodeEntities(token.href));
+        if (!href) { parent.append(document.createTextNode(token.raw)); break; }
+        const link = node("a"); link.href = href; link.target = "_blank"; link.rel = "noopener noreferrer";
+        children(link); parent.append(link); break;
+      }
+      case "table": {
+        const scroll = node("div", undefined, "table-scroll");
+        scroll.tabIndex = 0; scroll.setAttribute("role", "region"); scroll.setAttribute("aria-label", "Scrollable response table");
+        const table = node("table"); table.setAttribute("aria-label", "Assistant response table");
+        const head = node("thead"), header = node("tr"), body = node("tbody");
+        const cell = (data, tag, index) => {
+          const element = node(tag);
+          if (tag === "th") element.scope = "col";
+          if (["left", "center", "right"].includes(token.align[index])) element.style.textAlign = token.align[index];
+          renderTokens(element, data.tokens, context, depth + 1);
+          return element;
+        };
+        token.header.forEach((data, index) => header.append(cell(data, "th", index)));
+        head.append(header);
+        for (const row of token.rows) {
+          const tr = node("tr"); row.forEach((data, index) => tr.append(cell(data, "td", index))); body.append(tr);
+        }
+        table.append(head, body); scroll.append(table); parent.append(scroll); break;
+      }
+      // HTML, images and unsupported extensions remain inert text. No remote images.
+      default: parent.append(document.createTextNode(token.raw || token.text || ""));
+    }
   }
-  parent.append(document.createTextNode(text.slice(cursor)));
 }
 
 function messageBody(text) {
-  const body = node("div", undefined, "bubble");
-  const lines = text.split("\n");
-  let paragraph = [], code = [], fence = null;
-  const flush = () => {
-    if (!paragraph.length) return;
-    const part = node("p");
-    inlineText(part, paragraph.join("\n"));
-    body.append(part);
-    paragraph = [];
-  };
-  for (const line of lines) {
-    if (fence) {
-      if (line.startsWith(fence)) {
-        const pre = node("pre");
-        pre.append(node("code", code.join("\n")));
-        body.append(pre);
-        fence = null; code = [];
-      } else code.push(line);
-    } else if (/^`{3,}/.test(line)) {
-      flush(); fence = line.match(/^`+/)[0];
-    } else if (!line.trim()) flush();
-    else paragraph.push(line);
+  const body = node("div", undefined, "bubble markdown");
+  try {
+    renderTokens(body, marked.lexer(text, { gfm: true, breaks: false }), { count: 0 });
+  } catch {
+    // A malformed or excessively nested response must not break the chat interface.
+    body.replaceChildren(node("p", text));
   }
-  if (fence) { const pre = node("pre"); pre.append(node("code", code.join("\n"))); body.append(pre); }
-  flush();
   return body;
 }
 

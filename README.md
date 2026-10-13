@@ -2,7 +2,7 @@
 
 A custom conversation integration that signs in with your **ChatGPT account** and uses eligible account models in Home Assistant Assist. Device access is opt-in and uses Home Assistant's built-in Assist API.
 
-**Status:** version **0.5.1**, tested against Home Assistant Core **2026.3.4** and **2026.10.1**, Python **3.14**. OAuth and inference follow the documented OpenAI OSS preview. Live GPT-6.1 Sol text inference and a synthetic function-call round trip have been verified. Your account eligibility and a real home installation still require your verification. Other Home Assistant versions have not been verified. This is an independent project, not an official OpenAI or Home Assistant integration.
+**Status:** version **0.5.2**, tested against Home Assistant Core **2026.3.4** and **2026.10.1**, Python **3.14**. OAuth and inference follow the documented OpenAI OSS preview. Live GPT-6.1 Sol text inference and a synthetic function-call round trip have been verified. Your account eligibility and a real home installation still require your verification. Other Home Assistant versions have not been verified. This is an independent project, not an official OpenAI or Home Assistant integration.
 
 ## What it does
 
@@ -10,7 +10,7 @@ A custom conversation integration that signs in with your **ChatGPT account** an
 - Manage automation, dashboard and history-sensor grants in separate **collapsible sections**, closed initially, with named checklists and Select all/none controls. Bulk selection refreshes the checklist for review before saving; future discoveries are never automatically granted.
 - Inspect automation triggers/conditions/actions and dashboard configuration, prepare drafts, and apply or restore them through an administrator review form when separately enabled.
 - Optionally search the internet through OpenAI’s hosted web-search tool and show clickable source citations in Assist. Search starts disabled and depends on model/account eligibility. See the [internet search guide](docs/WEB_SEARCH.md).
-- Open **ChatGPT Assist** from the sidebar for a dedicated chat with private per-user history, Enter to send, Shift+Enter for new lines, and a **Clear message history** menu option. See the [sidebar chat guide](docs/SIDEBAR_CHAT.md).
+- Open **ChatGPT Assist** from the sidebar for a dedicated chat with private per-user history, Enter to send, Shift+Enter for new lines, a **Clear message history** menu option, and formatted Markdown tables, headings, lists, quotes and code. See the [sidebar chat guide](docs/SIDEBAR_CHAT.md).
 - Discover models available to the authorized ChatGPT account.
 - Answer questions in Assist and retain conversation context through Home Assistant's chat log.
 - Read live home information and control exposed entities when you enable device access: for example lights, supported thermostat settings, and exposed scenes/scripts.
@@ -65,7 +65,7 @@ uv pip install --python .venv/bin/python -r requirements-dev.txt
 .venv/bin/ruff format --check custom_components scripts tests
 ```
 
-The sidebar frontend is served locally with no runtime JavaScript dependencies. Browser checks use development-only Playwright: `npm ci`, `npx playwright install chromium`, then `npm run test:panel`. On WSL mounted Windows drives that disallow symlinks, use `npm ci --no-bin-links` and `node node_modules/playwright/cli.js install chromium`.
+The sidebar frontend and its pinned Marked parser are bundled and served locally; there are no CDN imports or runtime downloads. The parser produces tokens, which an allowlist renders into safe DOM nodes. Run `npm run vendor:markdown` after deliberately updating the pinned parser; its MIT license is included. Browser checks use development-only Playwright: `npm ci`, `npx playwright install chromium`, then `npm run test:panel`. On WSL mounted Windows drives that disallow symlinks, use `npm ci --no-bin-links` and `node node_modules/playwright/cli.js install chromium`.
 
 CI tests both Core versions; `requirements-dev-current.txt` provides the 2026.10.1 test environment. Tests verify OAuth rejection paths, signed JWT validation, grant permissions, import identity, refresh serialization, protected files, failed/incomplete SSE streams, protocol limits and real HA chat-log dispatch with the original user context, nested permission forms, revoked history permissions, and actual SQLite Recorder states/statistics including display-unit conversion. Automated network tests use mocked or local responses. Separately, live GPT-6.1 Sol text inference and a synthetic function-call round trip have passed; real HA device commands remain unverified. [Live verification checklist](docs/INSTALLATION.md#verify-your-installation) covers installation and exposure checks.
 

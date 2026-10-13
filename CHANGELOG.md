@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2
+
+- Render GitHub Flavored Markdown in sidebar replies: proper tables with aligned headers/cells, headings, nested lists, read-only tasks, quotes, emphasis/strikethrough, rules and labeled code blocks.
+- Keep tables horizontally scrollable inside mobile messages and support keyboard focus. Render HTML/images as inert text and allow only credential-free HTTP(S) links.
+- Bundle a pinned, MIT-licensed Marked lexer locally, render its tokens through a DOM allowlist, and update the frontend cache version. Add parser reproduction and browser formatting/security/layout checks.
+
 ## 0.5.1
 
 - Group automation, dashboard and sensor-history checklists into native collapsible permission sections, closed initially. Keep general capability switches visible and open affected sections after bulk actions or validation errors.

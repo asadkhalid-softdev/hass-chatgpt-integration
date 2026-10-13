@@ -8,8 +8,10 @@ let browser, server, origin;
 before(async () => {
   await mkdir("test-results", {recursive: true});
   const script = await readFile(new URL("../../custom_components/chatgpt_assist/frontend/panel.js", import.meta.url));
+  const markdown = await readFile(new URL("../../custom_components/chatgpt_assist/frontend/vendor/marked.js", import.meta.url));
   server = createServer((request, response) => {
-    if (request.url === "/panel.js") { response.writeHead(200, {"Content-Type": "text/javascript"}); response.end(script); }
+    if (request.url.startsWith("/vendor/marked.js")) { response.writeHead(200, {"Content-Type": "text/javascript"}); response.end(markdown); }
+    else if (request.url === "/panel.js") { response.writeHead(200, {"Content-Type": "text/javascript"}); response.end(script); }
     else { response.writeHead(200, {"Content-Type": "text/html"}); response.end('<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body{margin:0;height:100%;font-family:system-ui}</style></head><body><script type="module" src="/panel.js"></script></body></html>'); }
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -147,4 +149,83 @@ test("identity switch clears visible private content and draft before network re
     assert.equal(await page.getByRole("textbox", {name: "Your message"}).inputValue(), "");
     assert.equal(await page.getByRole("textbox", {name: "Your message"}).isDisabled(), true);
   } finally { await page.close(); }
+});
+
+test("GFM tables and rich Markdown render semantically with safe nested content", async () => {
+  const content = [
+    "## Temperature report", "", "| Sensor | Average | Note |", "| :--- | ---: | :---: |",
+    "| **Bedroom** | 20.5 °C | [Source](https://example.com/data) |",
+    "| Kitchen | 21 °C | escaped \\| pipe |", "",
+    "1. First step", "   - Nested *detail* with ~~old~~ text", "2. Second step", "",
+    "- [x] Completed", "- [ ] Pending", "", "> **Summary:** stable &amp; comfortable.", "",
+    "---", "", "```yaml", "alias: Example", "# <script> is literal code", "```"
+  ].join("\n");
+  const page = await fixture(1200, [{role: "assistant", content, time: 1700000000}]);
+  try {
+    assert.equal(await page.getByRole("heading", {name: "Temperature report"}).count(), 1);
+    assert.equal(await page.getByRole("table").count(), 1);
+    assert.equal(await page.getByRole("columnheader").count(), 3);
+    assert.equal(await page.getByRole("row").count(), 3);
+    assert.equal(await page.getByRole("cell", {name: "escaped | pipe", exact: true}).count(), 1);
+    assert.equal(await page.getByRole("columnheader", {name: "Average"}).evaluate((el) => getComputedStyle(el).textAlign), "right");
+    assert.equal(await page.locator("chatgpt-assist-panel ol > li ul > li em").textContent(), "detail");
+    assert.equal(await page.locator("chatgpt-assist-panel del").textContent(), "old");
+    assert.match(await page.locator("chatgpt-assist-panel blockquote").textContent(), /stable & comfortable/);
+    assert.equal(await page.getByRole("checkbox", {name: "Completed task"}).isChecked(), true);
+    assert.equal(await page.getByRole("checkbox", {name: "Incomplete task"}).isDisabled(), true);
+    assert.doesNotMatch(await page.locator("chatgpt-assist-panel .bubble").textContent(), /\[x\]|\[ \]/);
+    assert.equal(await page.locator("chatgpt-assist-panel hr").count(), 1);
+    assert.equal(await page.locator("chatgpt-assist-panel .code-language").textContent(), "yaml");
+    assert.match(await page.locator("chatgpt-assist-panel pre code").textContent(), /<script>/);
+    assert.equal(await page.getByRole("link", {name: "Source"}).getAttribute("rel"), "noopener noreferrer");
+    await page.screenshot({path: "/tmp/chatgpt-assist-markdown-desktop.png", fullPage: true});
+  } finally { await page.close(); }
+});
+
+test("wide tables scroll inside mobile messages in light and dark themes", async () => {
+  const content = "| Sensor | Minimum | Maximum | Average | Source |\n| --- | ---: | ---: | ---: | --- |\n| Bedroom | 18 °C | 23 °C | 20.5 °C | sensor.bedroom_temperature |\n| Kitchen | 19 °C | 24 °C | 21 °C | sensor.kitchen_temperature |";
+  const page = await fixture(390, [{role: "assistant", content, time: 1700000000}]);
+  try {
+    const scroll = page.getByRole("region", {name: "Scrollable response table"});
+    assert.equal(await scroll.evaluate((el) => el.scrollWidth > el.clientWidth), true);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+    const bounds = await scroll.boundingBox();
+    assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= 390);
+    await scroll.focus(); await scroll.press("ArrowRight");
+    await page.waitForFunction(() => document.querySelector("chatgpt-assist-panel").shadowRoot.querySelector(".table-scroll").scrollLeft > 0);
+    await page.screenshot({path: "/tmp/chatgpt-assist-markdown-mobile.png", fullPage: true});
+    await page.evaluate(() => {
+      const panel = document.querySelector("chatgpt-assist-panel");
+      for (const [key, value] of Object.entries({"--primary-background-color":"#111827", "--card-background-color":"#1f2937", "--secondary-background-color":"#283548", "--primary-text-color":"#f3f4f6", "--secondary-text-color":"#b8c1d1", "--divider-color":"#435166"})) panel.style.setProperty(key, value);
+    });
+    assert.equal(await page.getByRole("columnheader", {name: "Sensor"}).evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(40, 53, 72)");
+    await page.screenshot({path: "/tmp/chatgpt-assist-markdown-dark.png", fullPage: true});
+  } finally { await page.close(); }
+});
+
+test("Markdown cannot execute HTML, embed images, or create unsafe links", async () => {
+  const content = [
+    "| Payload | Link |", "| --- | --- |",
+    '| <img src="https://attacker.invalid/pixel" onerror="window.pwned=1"> | [unsafe](javascript:alert%281%29) |', "",
+    '<script>window.pwned=2</script>', "", '<iframe src="https://attacker.invalid/iframe"></iframe>', "",
+    '![tracker](https://attacker.invalid/image)', "", '[data](data:text/html,evil)', "",
+    '[credentials](https://user:password@example.com/)', "", '[encoded](javascript&#58;alert%281%29)', "",
+    '&lt;img src=x onerror=window.pwned=3&gt;', "", '[safe **bold**](https://example.com/?a=1&b=2)', "",
+    '```html', '<img src=x onerror="window.pwned=4">', '```'
+  ].join("\n");
+  const page = await fixture(1200, [{role: "assistant", content, time: 1700000000}]);
+  try {
+    assert.equal(await page.locator("chatgpt-assist-panel .bubble img, chatgpt-assist-panel .bubble iframe, chatgpt-assist-panel .bubble script").count(), 0);
+    assert.equal(await page.locator("chatgpt-assist-panel .bubble a").count(), 1);
+    assert.equal(await page.getByRole("link", {name: "safe bold"}).getAttribute("href"), "https://example.com/?a=1&b=2");
+    assert.equal(await page.evaluate(() => window.pwned), undefined);
+    assert.equal(await page.evaluate(() => performance.getEntriesByType("resource").some((item) => item.name.includes("attacker.invalid"))), false);
+    assert.match(await page.locator("chatgpt-assist-panel .bubble").textContent(), /<img src=x/);
+  } finally { await page.close(); }
+});
+
+test("bundled Markdown parser matches the pinned dependency and includes its license", async () => {
+  const source = (await readFile(new URL("../../node_modules/marked/lib/marked.esm.js", import.meta.url), "utf8")).replace(/^\/\/# sourceMappingURL=.*\n?/gm, "");
+  assert.equal(await readFile(new URL("../../custom_components/chatgpt_assist/frontend/vendor/marked.js", import.meta.url), "utf8"), source);
+  assert.equal(await readFile(new URL("../../custom_components/chatgpt_assist/frontend/vendor/marked.LICENSE", import.meta.url), "utf8"), await readFile(new URL("../../node_modules/marked/LICENSE", import.meta.url), "utf8"));
 });

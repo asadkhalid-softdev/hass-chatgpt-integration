@@ -296,8 +296,21 @@ async def test_panel_registration_once_and_last_unload_removes_sidebar(chat):
     await panel.async_setup_panel(hass, entry)
     await panel.async_setup_panel(hass, entry)
     hass.http.async_register_static_paths.assert_awaited_once()
+    from pathlib import Path
+
+    paths = hass.http.async_register_static_paths.call_args.args[0]
+    assert {item.url_path for item in paths} == {
+        panel.ASSET_URL,
+        "/chatgpt_assist_static/vendor/marked.js",
+    }
+    assert all(Path(item.path).is_file() for item in paths)
     assert frontend.DATA_PANELS in hass.data
     assert panel.PANEL_PATH in hass.data[frontend.DATA_PANELS]
+    assert (
+        hass.data[frontend.DATA_PANELS][panel.PANEL_PATH]
+        .config["_panel_custom"]["module_url"]
+        .endswith("?v=0.5.2")
+    )
     panel.async_unload_panel(hass, entry.entry_id)
     assert panel.PANEL_PATH not in hass.data[frontend.DATA_PANELS]
 

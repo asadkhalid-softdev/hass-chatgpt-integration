@@ -341,7 +341,14 @@ async def async_setup_panel(hass: HomeAssistant, entry):
             backend = SidebarChat(hass)
             await backend.load()
             await hass.http.async_register_static_paths(
-                [StaticPathConfig(ASSET_URL, str(Path(__file__).parent / "frontend" / "panel.js"), False)]
+                [
+                    StaticPathConfig(ASSET_URL, str(Path(__file__).parent / "frontend" / "panel.js"), False),
+                    StaticPathConfig(
+                        "/chatgpt_assist_static/vendor/marked.js",
+                        str(Path(__file__).parent / "frontend" / "vendor" / "marked.js"),
+                        False,
+                    ),
+                ]
             )
             websocket_api.async_register_command(hass, websocket_sidebar)
             hass.data[PANEL_KEY] = backend
@@ -354,7 +361,7 @@ async def async_setup_panel(hass: HomeAssistant, entry):
                 webcomponent_name="chatgpt-assist-panel",
                 sidebar_title="ChatGPT Assist",
                 sidebar_icon="mdi:chat-outline",
-                module_url=ASSET_URL + "?v=0.4.0",
+                module_url=ASSET_URL + "?v=0.5.2",
                 require_admin=False,
             )
 
