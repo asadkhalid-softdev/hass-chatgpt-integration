@@ -123,6 +123,7 @@ Remove the integration entry to delete local config credentials and its rotated-
 | Problem | Check |
 | --- | --- |
 | Sign-in denied or plan permission missing | Authorize ChatGPT plan use; check account/workspace eligibility and policy. |
+| Helper reports a token-verification failure | Share only the bracketed reason code (for example `audience_mismatch` or `nonce_mismatch`). Never share tokens or credential JSON. |
 | Credentials rejected | Sign in again; import before access-token expiry; use the complete JSON and same registration for reauth. |
 | No models available | OpenAI did not return eligible visible models for this account. Check workspace policy. |
 | Usage limit or incomplete response | Review ChatGPT Usage. Check device state before retrying; earlier actions may already have run. |

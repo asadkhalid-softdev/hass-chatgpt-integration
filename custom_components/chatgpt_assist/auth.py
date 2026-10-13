@@ -104,11 +104,14 @@ async def verify_jwt(
     session: aiohttp.ClientSession, token: str, audience: str, nonce: str | None = None
 ) -> dict:
     """Verify signature, issuer, audience, required claims and optionally OIDC nonce."""
+    label = "ID token" if nonce is not None else "access token"
+    if not isinstance(token, str) or not token:
+        raise AuthError(f"The {label} could not be verified [missing_token]. OpenAI did not return it.")
     keys = await request_json(session, "GET", JWKS_URL)
     try:
         header = jwt.get_unverified_header(token)
         if header.get("alg") != "RS256":
-            raise ValueError
+            raise AuthError(f"The {label} could not be verified [unsupported_algorithm].")
         key_data = next(key for key in keys["keys"] if key["kid"] == header["kid"])
         key = jwt.PyJWK.from_dict(key_data, algorithm="RS256").key
         claims = jwt.decode(
@@ -120,10 +123,30 @@ async def verify_jwt(
             options={"require": ["exp", "iat", "iss", "aud", "sub"]},
         )
         if nonce is not None and not secrets.compare_digest(str(claims.get("nonce", "")), nonce):
-            raise ValueError
+            raise AuthError(f"The {label} could not be verified [nonce_mismatch].")
         return claims
-    except (jwt.PyJWTError, ValueError, KeyError, StopIteration, TypeError):
-        raise AuthError("The signed account token could not be verified.") from None
+    except jwt.ExpiredSignatureError:
+        raise AuthError(
+            f"The {label} could not be verified [expired]. Check Windows time and sign in again."
+        ) from None
+    except jwt.ImmatureSignatureError:
+        raise AuthError(
+            f"The {label} could not be verified [not_yet_valid]. Sync Windows time and sign in again."
+        ) from None
+    except jwt.InvalidIssuerError:
+        raise AuthError(f"The {label} could not be verified [issuer_mismatch].") from None
+    except jwt.InvalidAudienceError:
+        raise AuthError(f"The {label} could not be verified [audience_mismatch].") from None
+    except jwt.InvalidSignatureError:
+        raise AuthError(f"The {label} could not be verified [invalid_signature].") from None
+    except jwt.MissingRequiredClaimError as err:
+        # The claim name comes from our fixed required-claims list, never token data.
+        claim = err.claim if err.claim in {"exp", "iat", "iss", "aud", "sub"} else "required"
+        raise AuthError(f"The {label} could not be verified [missing_{claim}_claim].") from None
+    except StopIteration:
+        raise AuthError(f"The {label} could not be verified [unknown_signing_key].") from None
+    except (jwt.PyJWTError, ValueError, KeyError, TypeError):
+        raise AuthError(f"The {label} could not be verified [invalid_token_format].") from None
 
 
 def token_record(

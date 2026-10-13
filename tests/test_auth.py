@@ -162,3 +162,38 @@ async def test_revoked_refresh_starts_reauth(monkeypatch):
         await account.access_token()
     account.entry.async_start_reauth.assert_called_once()
     account.store.async_save.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "failure,code",
+    [
+        (jwt.ExpiredSignatureError(), "expired"),
+        (jwt.ImmatureSignatureError(), "not_yet_valid"),
+        (jwt.InvalidIssuerError("private-issuer"), "issuer_mismatch"),
+        (jwt.InvalidAudienceError("private-client"), "audience_mismatch"),
+        (jwt.InvalidSignatureError("private-signature"), "invalid_signature"),
+        (jwt.MissingRequiredClaimError("iat"), "missing_iat_claim"),
+        (jwt.DecodeError("private-token"), "invalid_token_format"),
+    ],
+)
+async def test_safe_verification_diagnostics(monkeypatch, failure, code):
+    from unittest.mock import Mock
+
+    monkeypatch.setattr(auth, "request_json", AsyncMock(return_value={"keys": [{"kid": "test"}]}))
+    monkeypatch.setattr(jwt, "get_unverified_header", lambda token: {"alg": "RS256", "kid": "test"})
+    monkeypatch.setattr(jwt.PyJWK, "from_dict", lambda *args, **kwargs: SimpleNamespace(key="public"))
+    monkeypatch.setattr(jwt, "decode", Mock(side_effect=failure))
+    with pytest.raises(auth.AuthError) as error:
+        await auth.verify_jwt(None, "private-token", "private-client", "private-nonce")
+    assert "[" + code + "]" in str(error.value)
+    assert "private-" not in str(error.value)
+
+
+async def test_nonce_diagnostic_keeps_nonce_private(monkeypatch):
+    monkeypatch.setattr(auth, "request_json", AsyncMock(return_value={"keys": [{"kid": "test"}]}))
+    monkeypatch.setattr(jwt, "get_unverified_header", lambda token: {"alg": "RS256", "kid": "test"})
+    monkeypatch.setattr(jwt.PyJWK, "from_dict", lambda *args, **kwargs: SimpleNamespace(key="public"))
+    monkeypatch.setattr(jwt, "decode", lambda *args, **kwargs: {"nonce": "wrong-private-nonce"})
+    with pytest.raises(auth.AuthError, match=r"\[nonce_mismatch\]") as error:
+        await auth.verify_jwt(None, "private-token", "client", "private-nonce")
+    assert "private-" not in str(error.value)
