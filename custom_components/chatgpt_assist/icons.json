@@ -1,0 +1,13 @@
+{
+  "options": {
+    "step": {
+      "settings": {
+        "sections": {
+          "automations": "mdi:robot",
+          "dashboards": "mdi:view-dashboard",
+          "sensors": "mdi:chart-line"
+        }
+      }
+    }
+  }
+}

@@ -185,7 +185,9 @@ class ChatGPTConversation(conversation.ConversationEntity):
             try:
                 await access.authorize(user_input.context.user_id)
                 for item in chat_log.content:
-                    if isinstance(item, conversation.ToolResultContent) and item.tool_name.startswith("history_"):
+                    if isinstance(item, conversation.ToolResultContent) and item.tool_name.startswith(
+                        "history_"
+                    ):
                         data = item.result.data if hasattr(item, "result") else item.tool_result
                         if isinstance(data, dict):
                             await access.authorize(user_input.context.user_id, data.get("entity_ids", []))

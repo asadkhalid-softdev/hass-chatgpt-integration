@@ -261,7 +261,7 @@ async def test_search_option_default_off_and_saved_in_native_settings(tmp_path, 
     flow.hass = hass
     try:
         form = await flow.async_step_settings()
-        options = form["data_schema"]({})
+        options = form["data_schema"]({"automations": {}, "dashboards": {}, "sensors": {}})
         assert options["web_search"] is False
         options["web_search"] = True
         saved = await flow.async_step_settings(options)

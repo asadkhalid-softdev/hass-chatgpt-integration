@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from homeassistant.config_entries import ConfigFlow, OptionsFlow
 from homeassistant.core import callback
+from homeassistant.data_entry_flow import section
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.http import current_request
 from homeassistant.helpers.selector import (
@@ -27,6 +28,48 @@ from .auth import AuthError, ConnectionError, validate_import
 from .compat import schema as vol
 from .const import DOMAIN
 from .history import choices as history_choices
+
+SETTINGS_SECTIONS = {
+    "automations": {
+        "automation_ids",
+        "select_all_automations",
+        "select_none_automations",
+        "new_automation_ids",
+    },
+    "dashboards": {"dashboard_paths", "select_all_dashboards", "select_none_dashboards"},
+    "sensors": {"history_entity_ids", "select_all_history", "select_none_history"},
+}
+
+
+def _group_settings(values):
+    """Group only the form fields; persisted options remain flat for compatibility."""
+    grouped = dict(values)
+    for name, fields in SETTINGS_SECTIONS.items():
+        grouped[name] = {field: grouped.pop(field) for field in fields if field in grouped}
+    return grouped
+
+
+def _flatten_settings(values):
+    """Unpack native sections before validating grants and one-shot bulk actions."""
+    flat = dict(values)
+    for name, fields in SETTINGS_SECTIONS.items():
+        nested = flat.pop(name, {})
+        flat.update({field: value for field, value in nested.items() if field in fields})
+    return flat
+
+
+def _sectioned_schema(flat_schema, opened):
+    """Keep general settings visible and permission checklists collapsed initially."""
+    fields = flat_schema.schema
+    grouped_fields = set().union(*SETTINGS_SECTIONS.values())
+    top = {key: value for key, value in fields.items() if key.schema not in grouped_fields}
+    for name, members in SETTINGS_SECTIONS.items():
+        top[vol.Required(name)] = section(
+            vol.Schema({key: value for key, value in fields.items() if key.schema in members}),
+            {"collapsed": name not in opened},
+        )
+    return vol.Schema(top)
+
 
 CREDENTIAL_SCHEMA = vol.Schema(
     {vol.Required("credentials"): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))}
@@ -195,16 +238,17 @@ class ChatGPTOptionsFlow(OptionsFlow):
             "history_entity_ids": ("select_all_history", "select_none_history", "history"),
         }
         bulk_requested = False
+        opened = set()
         if user_input is not None:
-            user_input = dict(user_input)
+            user_input = _flatten_settings(user_input)
             for field, (select_all, select_none, kind) in bulk_fields.items():
                 if user_input.get(select_all) and user_input.get(select_none):
                     errors[select_none] = "conflicting_bulk_selection"
                 elif user_input.get(select_all) or user_input.get(select_none):
                     bulk_requested = True
+                    opened.update(name for name, fields in SETTINGS_SECTIONS.items() if field in fields)
                     user_input[field] = (
-                        sorted(item["value"] for item in choices[kind])
-                        if user_input.get(select_all) else []
+                        sorted(item["value"] for item in choices[kind]) if user_input.get(select_all) else []
                     )
                     if kind == "automation" and user_input.get(select_none):
                         user_input["new_automation_ids"] = ""
@@ -234,56 +278,80 @@ class ChatGPTOptionsFlow(OptionsFlow):
             models = [
                 {"value": self.config_entry.options["model"], "label": self.config_entry.options["model"]}
             ]
+        section_errors = {}
+        for field, reason in errors.items():
+            group = next((name for name, fields in SETTINGS_SECTIONS.items() if field in fields), field)
+            section_errors[group] = reason
+            opened.add(group)
+        suggested = (
+            user_input
+            if user_input is not None
+            else {
+                **self.config_entry.options,
+                "automation_ids": sorted(scopes(self.config_entry.options, "automation")),
+                "dashboard_paths": sorted(scopes(self.config_entry.options, "dashboard")),
+            }
+        )
         return self.async_show_form(
             step_id="settings",
             data_schema=self.add_suggested_values_to_schema(
-                vol.Schema(
-                    {
-                        vol.Required("model", default=self.config_entry.options["model"]): SelectSelector(
-                            SelectSelectorConfig(options=models)
-                        ),
-                        vol.Required(
-                            "control", default=self.config_entry.options.get("control", False)
-                        ): BooleanSelector(),
-                        vol.Required(
-                            "web_search", default=self.config_entry.options.get("web_search", False)
-                        ): BooleanSelector(),
-                        vol.Required(
-                            "administration", default=self.config_entry.options.get("administration", False)
-                        ): BooleanSelector(),
-                        vol.Optional("select_all_automations", default=False): BooleanSelector(),
-                        vol.Optional("select_none_automations", default=False): BooleanSelector(),
-                        vol.Required(
-                            "automation_ids", default=sorted(scopes(self.config_entry.options, "automation"))
-                        ): SelectSelector(
-                            SelectSelectorConfig(
-                                options=choices["automation"], multiple=True, mode=SelectSelectorMode.LIST
-                            )
-                        ),
-                        vol.Optional("select_all_dashboards", default=False): BooleanSelector(),
-                        vol.Optional("select_none_dashboards", default=False): BooleanSelector(),
-                        vol.Required(
-                            "dashboard_paths", default=sorted(scopes(self.config_entry.options, "dashboard"))
-                        ): SelectSelector(
-                            SelectSelectorConfig(
-                                options=choices["dashboard"], multiple=True, mode=SelectSelectorMode.LIST
-                            )
-                        ),
-                        vol.Optional("new_automation_ids", default=""): TextSelector(),
-                        vol.Required(
-                            "history_access", default=self.config_entry.options.get("history_access", False)
-                        ): BooleanSelector(),
-                        vol.Optional("select_all_history", default=False): BooleanSelector(),
-                        vol.Optional("select_none_history", default=False): BooleanSelector(),
-                        vol.Required(
-                            "history_entity_ids", default=self.config_entry.options.get("history_entity_ids", [])
-                        ): SelectSelector(SelectSelectorConfig(
-                            options=choices["history"], multiple=True, mode=SelectSelectorMode.LIST
-                        )),
-                    }
+                _sectioned_schema(
+                    vol.Schema(
+                        {
+                            vol.Required("model", default=self.config_entry.options["model"]): SelectSelector(
+                                SelectSelectorConfig(options=models)
+                            ),
+                            vol.Required(
+                                "control", default=self.config_entry.options.get("control", False)
+                            ): BooleanSelector(),
+                            vol.Required(
+                                "web_search", default=self.config_entry.options.get("web_search", False)
+                            ): BooleanSelector(),
+                            vol.Required(
+                                "administration",
+                                default=self.config_entry.options.get("administration", False),
+                            ): BooleanSelector(),
+                            vol.Optional("select_all_automations", default=False): BooleanSelector(),
+                            vol.Optional("select_none_automations", default=False): BooleanSelector(),
+                            vol.Required(
+                                "automation_ids",
+                                default=sorted(scopes(self.config_entry.options, "automation")),
+                            ): SelectSelector(
+                                SelectSelectorConfig(
+                                    options=choices["automation"], multiple=True, mode=SelectSelectorMode.LIST
+                                )
+                            ),
+                            vol.Optional("select_all_dashboards", default=False): BooleanSelector(),
+                            vol.Optional("select_none_dashboards", default=False): BooleanSelector(),
+                            vol.Required(
+                                "dashboard_paths",
+                                default=sorted(scopes(self.config_entry.options, "dashboard")),
+                            ): SelectSelector(
+                                SelectSelectorConfig(
+                                    options=choices["dashboard"], multiple=True, mode=SelectSelectorMode.LIST
+                                )
+                            ),
+                            vol.Optional("new_automation_ids", default=""): TextSelector(),
+                            vol.Required(
+                                "history_access",
+                                default=self.config_entry.options.get("history_access", False),
+                            ): BooleanSelector(),
+                            vol.Optional("select_all_history", default=False): BooleanSelector(),
+                            vol.Optional("select_none_history", default=False): BooleanSelector(),
+                            vol.Required(
+                                "history_entity_ids",
+                                default=self.config_entry.options.get("history_entity_ids", []),
+                            ): SelectSelector(
+                                SelectSelectorConfig(
+                                    options=choices["history"], multiple=True, mode=SelectSelectorMode.LIST
+                                )
+                            ),
+                        }
+                    ),
+                    opened,
                 ),
-                user_input or {},
+                _group_settings(suggested),
             ),
-            errors=errors,
+            errors=section_errors,
             description_placeholders={"discovery_notice": notice},
         )

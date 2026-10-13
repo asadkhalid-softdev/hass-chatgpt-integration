@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+- Group automation, dashboard and sensor-history checklists into native collapsible permission sections, closed initially. Keep general capability switches visible and open affected sections after bulk actions or validation errors.
+- Preserve existing flat stored grants while processing nested Home Assistant form submissions; keep Select all/none and draft review behavior unchanged.
+- Update the README with HACS installation, all current capabilities and the independent history permission/privacy boundary.
+
 ## 0.5.0
 
 - Add separately permissioned, read-only sensor history with a named sensor checklist and Select all / Select none controls. History can be enabled without device control or configuration drafting.

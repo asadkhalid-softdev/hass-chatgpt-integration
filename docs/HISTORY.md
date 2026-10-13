@@ -7,7 +7,7 @@ Version 0.5.0 adds read-only tools for the Recorder data behind Home Assistant s
 1. Push the update, redownload ChatGPT Assist in HACS from the default branch, and restart Home Assistant.
 2. Open **Settings → Devices & services → ChatGPT Assist → Configure → Model and permissions**.
 3. Enable **Allow read-only sensor history**.
-4. Check **Allowed sensors for history**. Sensors and binary sensors are listed by name and entity ID. Nothing new is selected automatically. Saved unavailable sensors remain listed so you can revoke them.
+4. Expand **Sensor history** (closed initially) and check **Allowed sensors for history**. Sensors and binary sensors are listed by name and entity ID. Nothing new is selected automatically. Saved unavailable sensors remain listed so you can revoke them.
 5. For bulk selection, check **Select all listed history sensors** or **Select none (history sensors)** and submit. Review the refreshed checklist, then submit again to save. Future discoveries are not automatically allowed.
 6. Open the ChatGPT Assist sidebar or Assist and ask about a selected sensor.
 

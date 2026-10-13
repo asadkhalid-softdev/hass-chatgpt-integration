@@ -15,6 +15,7 @@ from custom_components.chatgpt_assist.administration import ConfigurationAPI
 from custom_components.chatgpt_assist.compat import schema_to_json
 from custom_components.chatgpt_assist.config_flow import ChatGPTOptionsFlow
 from custom_components.chatgpt_assist.conversation import ChatGPTConversation
+from tests.settings_form import settings_fields, suggested_settings, validate_settings
 
 
 @pytest.fixture
@@ -195,19 +196,15 @@ async def test_history_checklist_bulk_review_preserves_grants(environment, monke
     flow = ChatGPTOptionsFlow()
     flow.hass = hass
     form = await flow.async_step_settings()
-    assert form["data_schema"]({})["history_entity_ids"] == ["sensor.temperature"]
-    result = await flow.async_step_settings(form["data_schema"]({"select_all_history": True}))
-    suggested = {
-        key.schema: key.description["suggested_value"]
-        for key in result["data_schema"].schema
-        if key.description and "suggested_value" in key.description
-    }
+    assert validate_settings(form, {})["history_entity_ids"] == ["sensor.temperature"]
+    result = await flow.async_step_settings(validate_settings(form, {"select_all_history": True}))
+    suggested = suggested_settings(result)
     assert suggested["history_entity_ids"] == ["sensor.private", "sensor.temperature"]
     assert entry.options["history_entity_ids"] == ["sensor.temperature"]
-    saved = await flow.async_step_settings(result["data_schema"](suggested))
+    saved = await flow.async_step_settings(validate_settings(result, suggested))
     assert saved["data"]["history_entity_ids"] == ["sensor.private", "sensor.temperature"]
-    result = await flow.async_step_settings(form["data_schema"]({"select_none_history": True}))
-    key = next(key for key in result["data_schema"].schema if key.schema == "history_entity_ids")
+    result = await flow.async_step_settings(validate_settings(form, {"select_none_history": True}))
+    key = next(key for key in settings_fields(result) if key.schema == "history_entity_ids")
     assert key.description["suggested_value"] == []
 
 

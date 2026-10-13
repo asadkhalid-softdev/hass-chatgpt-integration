@@ -2,10 +2,12 @@
 
 A custom conversation integration that signs in with your **ChatGPT account** and uses eligible account models in Home Assistant Assist. Device access is opt-in and uses Home Assistant's built-in Assist API.
 
-**Status:** initial release, tested against Home Assistant Core **2026.3.4** and **2026.10.1**, Python **3.14**. OAuth and inference follow the documented OpenAI OSS preview. Live GPT-6.1 Sol text inference and a synthetic function-call round trip have been verified. Your account eligibility and a real home installation still require your verification. Other Home Assistant versions have not been verified. This is an independent project, not an official OpenAI or Home Assistant integration.
+**Status:** version **0.5.1**, tested against Home Assistant Core **2026.3.4** and **2026.10.1**, Python **3.14**. OAuth and inference follow the documented OpenAI OSS preview. Live GPT-6.1 Sol text inference and a synthetic function-call round trip have been verified. Your account eligibility and a real home installation still require your verification. Other Home Assistant versions have not been verified. This is an independent project, not an official OpenAI or Home Assistant integration.
 
 ## What it does
 
+- Query past temperature, humidity and other selected sensors through read-only Recorder history and hourly/daily statistics. History has its own opt-in permission and works with device control disabled. See the [sensor history guide](docs/HISTORY.md).
+- Manage automation, dashboard and history-sensor grants in separate **collapsible sections**, closed initially, with named checklists and Select all/none controls. Bulk selection refreshes the checklist for review before saving; future discoveries are never automatically granted.
 - Inspect automation triggers/conditions/actions and dashboard configuration, prepare drafts, and apply or restore them through an administrator review form when separately enabled.
 - Optionally search the internet through OpenAI’s hosted web-search tool and show clickable source citations in Assist. Search starts disabled and depends on model/account eligibility. See the [internet search guide](docs/WEB_SEARCH.md).
 - Open **ChatGPT Assist** from the sidebar for a dedicated chat with private per-user history, Enter to send, Shift+Enter for new lines, and a **Clear message history** menu option. See the [sidebar chat guide](docs/SIDEBAR_CHAT.md).
@@ -28,7 +30,7 @@ There is no client secret to obtain, no borrowed Codex client ID, no ChatGPT bro
 
 Full instructions: [Installation guide](docs/INSTALLATION.md).
 
-1. Copy `custom_components/chatgpt_assist` into your HA configuration's `custom_components/` directory, then restart HA.
+1. In **HACS → Custom repositories**, add `https://github.com/asadkhalid-softdev/hass-chatgpt-integration` with category **Integration**. Find **ChatGPT Assist**, download it, and restart HA. For updates, use HACS **Update** or **Redownload** from the default branch, then restart HA.
 2. On your browser's computer, run this single line in PowerShell or Bash with `uv` installed. The helper manages its own dependencies:
 
    ```text
@@ -36,8 +38,10 @@ Full instructions: [Installation guide](docs/INSTALLATION.md).
    ```
 
 3. Open HA over HTTPS → **Settings → Devices & services → Add integration → ChatGPT Assist**. Paste the protected JSON credential file, then choose a model.
-4. Review exposed entities under **Settings → Voice assistants → Expose**. Enable device access in the integration's options only when ready.
+4. Open **ChatGPT Assist → Configure → Model and permissions**. Enable only the capabilities you want. Device control uses entities exposed under **Settings → Voice assistants → Expose**. Expand **Automations**, **Dashboards** and **Sensor history** to select grants for those separate capabilities; each section starts collapsed. Select all/none requires submitting once to refresh the checklist and again to save.
 5. Edit or add an assistant under **Settings → Voice assistants** and select the new **ChatGPT Assist** conversation agent. Speech recognition and text-to-speech are configured separately.
+
+For manual installation, copy `custom_components/chatgpt_assist` into your HA configuration's `custom_components/` directory and restart HA. To run the login helper, clone or download this repository onto the computer running your browser; HACS installs only the integration on the HA host.
 
 You can add multiple account/workspace registrations by using separate helper output files and adding separate integration entries. The integration title uses an issued client-ID suffix to distinguish registrations. Removing an entry attempts remote session revocation and removes its local rotated-token store.
 
@@ -47,7 +51,7 @@ See [Security model](SECURITY.md). Your questions, conversation context and Assi
 
 Tokens are sensitive secrets. The helper writes owner-only files on Unix and protected files accessible to the current account on Windows NTFS. HA stores initial credentials in its normal config-entry storage and renewed credentials in a dedicated atomic `.storage` record, **not an encrypted vault**. Secure your HA host and backups, access the UI over HTTPS, and revoke the app in ChatGPT Settings if credentials leak. Do not turn on broad HTTP/debug logging or include credential files in bug reports.
 
-A model can misunderstand requests or follow malicious device text. Exposure is the primary permission boundary. Avoid exposing door locks, alarms and powerful scripts until you have assessed the consequences. Assist device actions have no per-action confirmation UI or separate read-only mode. Configuration edits use a separate mandatory review form. With both device and configuration access disabled, the agent receives neither Assist tools nor Assist's home-state context.
+A model can misunderstand requests or follow malicious device text. Device exposure controls Assist device access; explicit checklists independently control sensor history and configuration access. Avoid exposing door locks, alarms and powerful scripts until you have assessed the consequences. Assist device actions have no per-action confirmation UI or separate read-only mode. Configuration edits use a separate mandatory review form. History queries are read-only and return only selected sensors the requesting HA user may read. With device control, configuration access and sensor history all disabled, the agent receives no home-data tools or Assist home-state context.
 
 A timeout or failure after a successful earlier tool call cannot roll that action back. Check the device state before repeating a command. The integration performs no automatic inference retries.
 
@@ -63,7 +67,7 @@ uv pip install --python .venv/bin/python -r requirements-dev.txt
 
 The sidebar frontend is served locally with no runtime JavaScript dependencies. Browser checks use development-only Playwright: `npm ci`, `npx playwright install chromium`, then `npm run test:panel`. On WSL mounted Windows drives that disallow symlinks, use `npm ci --no-bin-links` and `node node_modules/playwright/cli.js install chromium`.
 
-CI tests both Core versions; `requirements-dev-current.txt` provides the 2026.10.1 test environment. Tests verify OAuth rejection paths, signed JWT validation, grant permissions, import identity, refresh serialization, protected files, failed/incomplete SSE streams, protocol limits and real HA chat-log dispatch with the original user context. Automated network tests use mocked or local responses. Separately, live GPT-6.1 Sol text inference and a synthetic function-call round trip have passed; real HA device commands remain unverified. [Live verification checklist](docs/INSTALLATION.md#verify-your-installation) covers installation and exposure checks.
+CI tests both Core versions; `requirements-dev-current.txt` provides the 2026.10.1 test environment. Tests verify OAuth rejection paths, signed JWT validation, grant permissions, import identity, refresh serialization, protected files, failed/incomplete SSE streams, protocol limits and real HA chat-log dispatch with the original user context, nested permission forms, revoked history permissions, and actual SQLite Recorder states/statistics including display-unit conversion. Automated network tests use mocked or local responses. Separately, live GPT-6.1 Sol text inference and a synthetic function-call round trip have passed; real HA device commands remain unverified. [Live verification checklist](docs/INSTALLATION.md#verify-your-installation) covers installation and exposure checks.
 
 ## Research sources
 
@@ -80,7 +84,3 @@ Checked against these official sources during implementation:
 - [Home Assistant: LLM and Assist API boundaries](https://developers.home-assistant.io/docs/core/llm/)
 
 MIT licensed. The accompanying open-source license is part of the intended OSS deployment.
-
-## Sensor history
-
-Opt in to read-only temperature, humidity and other sensor history under **Configure → Model and permissions**. Choose allowed sensors using checklists or Select all/none. History works independently of device control and configuration drafts. See the [history guide](docs/HISTORY.md) for setup, example questions and retention/query limits.

@@ -635,7 +635,9 @@ class ConfigurationAPI(llm.API):
 
             access = HistoryAccess(self.hass, self.entry)
             tools.extend(HistoryTool(access, op) for op in ("list", "read"))
-            history_prompt = "\n" + HISTORY_PROMPT + f"\nHome Assistant local timezone: {self.hass.config.time_zone}."
+            history_prompt = (
+                "\n" + HISTORY_PROMPT + f"\nHome Assistant local timezone: {self.hass.config.time_zone}."
+            )
 
         return llm.APIInstance(
             api=self,

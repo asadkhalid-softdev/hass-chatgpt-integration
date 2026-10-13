@@ -22,6 +22,7 @@ from custom_components.chatgpt_assist.administration import (
 from custom_components.chatgpt_assist.compat import schema as vol
 from custom_components.chatgpt_assist.compat import schema_to_json
 from custom_components.chatgpt_assist.config_flow import ChatGPTOptionsFlow
+from tests.settings_form import settings_fields, suggested_settings, validate_settings
 
 
 @pytest.fixture
@@ -504,13 +505,15 @@ async def test_permissions_checklists_discover_names_and_preserve_grants(environ
     flow = ChatGPTOptionsFlow()
     flow.hass = hass
     form = await flow.async_step_settings()
-    defaults = form["data_schema"]({})
+    defaults = validate_settings(form, {})
     assert defaults["automation_ids"] == ["morning", "new"]
     assert defaults["dashboard_paths"] == ["missing-dashboard", "test-dashboard"]
     # Validate the actual form schema and inspect Core's serialized select selectors.
-    schema = schema_to_json(form["data_schema"], custom_serializer=llm.selector_serializer)
+    from homeassistant.helpers.data_entry_flow import _BaseFlowManagerView
+
+    schema = _BaseFlowManagerView(None)._prepare_result_json(form)["data_schema"]
     json.dumps(schema)
-    fields = {key.schema: value for key, value in form["data_schema"].schema.items()}
+    fields = {key.schema: value for key, value in settings_fields(form).items()}
     automations = fields["automation_ids"].config
     dashboards = fields["dashboard_paths"].config
     assert automations["mode"] == "list" and automations["multiple"] is True
@@ -523,7 +526,8 @@ async def test_permissions_checklists_discover_names_and_preserve_grants(environ
         item["label"] for item in dashboards["options"] if item["value"] == "test-dashboard"
     )
     saved = await flow.async_step_settings(
-        form["data_schema"](
+        validate_settings(
+            form,
             {
                 "model": "test",
                 "control": False,
@@ -531,14 +535,14 @@ async def test_permissions_checklists_discover_names_and_preserve_grants(environ
                 "automation_ids": ["morning"],
                 "dashboard_paths": [],
                 "new_automation_ids": "future_lights",
-            }
+            },
         )
     )
     assert saved["data"]["automation_ids"] == ["future_lights", "morning"]
     assert saved["data"]["dashboard_paths"] == []
     assert "new_automation_ids" not in saved["data"]
     with pytest.raises(vol.Invalid):
-        form["data_schema"]({"automation_ids": ["not-discovered-or-granted"]})
+        validate_settings(form, {"automation_ids": ["not-discovered-or-granted"]})
 
 
 async def test_discovery_failure_preserves_existing_selections_and_explains(environment, tmp_path):
@@ -608,7 +612,7 @@ async def test_invalid_creation_id_keeps_settings_form_open(environment, monkeyp
             "new_automation_ids": "../../bad",
         }
     )
-    assert result["errors"]["new_automation_ids"] == "invalid_automation_id"
+    assert result["errors"]["automations"] == "invalid_automation_id"
     assert entry.options["automation_ids"] == "morning,new"
 
 
@@ -629,7 +633,7 @@ async def test_empty_catalog_has_no_default_grants_and_explains_next_step(enviro
     flow = ChatGPTOptionsFlow()
     flow.hass = hass
     form = await flow.async_step_settings()
-    defaults = form["data_schema"]({})
+    defaults = validate_settings(form, {})
     assert defaults["automation_ids"] == []
     assert defaults["dashboard_paths"] == []
     assert "No automations" in form["description_placeholders"]["discovery_notice"]
@@ -760,8 +764,12 @@ async def test_read_only_source_rejects_ambiguous_or_recursive_yaml(environment,
     ],
 )
 async def test_bulk_permissions_are_reviewed_before_saving(
-    environment, monkeypatch, automation_action, dashboard_action,
-    expected_automations, expected_dashboards,
+    environment,
+    monkeypatch,
+    automation_action,
+    dashboard_action,
+    expected_automations,
+    expected_dashboards,
 ):
     from custom_components.chatgpt_assist import config_flow as flow_module
 
@@ -775,21 +783,25 @@ async def test_bulk_permissions_are_reviewed_before_saving(
     flow = ChatGPTOptionsFlow()
     flow.hass = hass
     form = await flow.async_step_settings()
-    submitted = form["data_schema"]({
-        "model": "test", "control": True, "web_search": True, "administration": True,
-        "automation_ids": [], "dashboard_paths": [], "new_automation_ids": "future_lights",
-        f"select_{automation_action}_automations": True,
-        f"select_{dashboard_action}_dashboards": True,
-    })
+    submitted = validate_settings(
+        form,
+        {
+            "model": "test",
+            "control": True,
+            "web_search": True,
+            "administration": True,
+            "automation_ids": [],
+            "dashboard_paths": [],
+            "new_automation_ids": "future_lights",
+            f"select_{automation_action}_automations": True,
+            f"select_{dashboard_action}_dashboards": True,
+        },
+    )
     result = await flow.async_step_settings(submitted)
     assert result["type"] == "form"
     assert result["errors"] == {}
     # Suggested values are what the frontend checks when redisplaying a form.
-    suggested = {
-        key.schema: key.description["suggested_value"]
-        for key in result["data_schema"].schema
-        if key.description and "suggested_value" in key.description
-    }
+    suggested = suggested_settings(result)
     assert suggested["automation_ids"] == expected_automations
     assert suggested["dashboard_paths"] == expected_dashboards
     assert suggested["control"] is True and suggested["web_search"] is True
@@ -798,7 +810,7 @@ async def test_bulk_permissions_are_reviewed_before_saving(
     assert entry.options["automation_ids"] == "morning,new"
     # The user may narrow the refreshed selections before saving.
     suggested["automation_ids"] = expected_automations[:1]
-    saved = await flow.async_step_settings(result["data_schema"](suggested))
+    saved = await flow.async_step_settings(validate_settings(result, suggested))
     reserved = [] if automation_action == "none" else ["future_lights"]
     assert saved["data"]["automation_ids"] == sorted(expected_automations[:1] + reserved)
     assert saved["data"]["dashboard_paths"] == expected_dashboards
@@ -817,14 +829,118 @@ async def test_conflicting_bulk_permissions_keep_form_and_existing_grants(enviro
     monkeypatch.setattr(ChatGPTOptionsFlow, "config_entry", property(lambda self: entry))
     flow = ChatGPTOptionsFlow()
     flow.hass = hass
-    result = await flow.async_step_settings({
-        "model": "test", "automation_ids": ["morning"], "dashboard_paths": [],
-        "select_all_automations": True, "select_none_automations": True,
-        "select_all_dashboards": True, "select_none_dashboards": True,
-    })
+    result = await flow.async_step_settings(
+        {
+            "model": "test",
+            "automation_ids": ["morning"],
+            "dashboard_paths": [],
+            "select_all_automations": True,
+            "select_none_automations": True,
+            "select_all_dashboards": True,
+            "select_none_dashboards": True,
+        }
+    )
     assert result["errors"] == {
-        "select_none_automations": "conflicting_bulk_selection",
-        "select_none_dashboards": "conflicting_bulk_selection",
+        "automations": "conflicting_bulk_selection",
+        "dashboards": "conflicting_bulk_selection",
     }
     assert entry.options["automation_ids"] == "morning,new"
     assert entry.options["dashboard_paths"] == "test-dashboard"
+
+
+async def test_native_permission_sections_start_closed_and_save_existing_flat_grants(
+    environment, monkeypatch
+):
+    from homeassistant.helpers.data_entry_flow import _BaseFlowManagerView
+
+    from custom_components.chatgpt_assist import config_flow as flow_module
+
+    hass, entry, _, _, _ = environment
+    entry.options["history_entity_ids"] = ["sensor.temperature"]
+    entry.options["history_access"] = True
+    entry.runtime_data.access_token = AsyncMock(return_value="fake")
+    monkeypatch.setattr(
+        flow_module, "available_models", AsyncMock(return_value=[{"value": "test", "label": "Test"}])
+    )
+    monkeypatch.setattr(flow_module, "async_get_clientsession", lambda hass: None)
+    monkeypatch.setattr(ChatGPTOptionsFlow, "config_entry", property(lambda self: entry))
+    flow = ChatGPTOptionsFlow()
+    flow.hass = hass
+    form = await flow.async_step_settings()
+    frontend = _BaseFlowManagerView(None)._prepare_result_json(form)
+    json.dumps(frontend)
+    sections = {
+        field["name"]: field for field in frontend["data_schema"] if field.get("type") == "expandable"
+    }
+    assert set(sections) == {"automations", "dashboards", "sensors"}
+    assert all(not field["expanded"] for field in sections.values())
+    assert {field["name"] for field in sections["automations"]["schema"]} == {
+        "automation_ids",
+        "select_all_automations",
+        "select_none_automations",
+        "new_automation_ids",
+    }
+    # Unchanged native sections retain grants, including unavailable saved targets.
+    nested = form["data_schema"]({"automations": {}, "dashboards": {}, "sensors": {}})
+    saved = await flow.async_step_settings(nested)
+    assert saved["data"]["automation_ids"] == ["morning", "new"]
+    assert saved["data"]["dashboard_paths"] == ["test-dashboard"]
+    assert saved["data"]["history_entity_ids"] == ["sensor.temperature"]
+    assert not {"automations", "dashboards", "sensors"} & saved["data"].keys()
+    # Missing sections fail form validation instead of silently erasing permissions.
+    with pytest.raises(vol.Invalid):
+        form["data_schema"]({"model": "test"})
+    fields = {key.schema: value for key, value in form["data_schema"].schema.items()}
+    assert fields["automations"].schema({})["automation_ids"] == ["morning", "new"]
+
+
+async def test_bulk_review_and_validation_open_only_affected_native_sections(environment, monkeypatch):
+    from homeassistant.helpers.data_entry_flow import _BaseFlowManagerView
+
+    from custom_components.chatgpt_assist import config_flow as flow_module
+
+    hass, entry, _, _, _ = environment
+    entry.runtime_data.access_token = AsyncMock(return_value="fake")
+    monkeypatch.setattr(
+        flow_module, "available_models", AsyncMock(return_value=[{"value": "test", "label": "Test"}])
+    )
+    monkeypatch.setattr(flow_module, "async_get_clientsession", lambda hass: None)
+    monkeypatch.setattr(ChatGPTOptionsFlow, "config_entry", property(lambda self: entry))
+    flow = ChatGPTOptionsFlow()
+    flow.hass = hass
+    form = await flow.async_step_settings()
+    result = await flow.async_step_settings(
+        form["data_schema"](
+            {
+                "automations": {"select_none_automations": True},
+                "dashboards": {},
+                "sensors": {},
+            }
+        )
+    )
+    sections = {
+        field["name"]: field
+        for field in _BaseFlowManagerView(None)._prepare_result_json(result)["data_schema"]
+        if field.get("type") == "expandable"
+    }
+    assert sections["automations"]["expanded"] is True
+    assert sections["dashboards"]["expanded"] is False and sections["sensors"]["expanded"] is False
+    checkbox = next(field for field in sections["automations"]["schema"] if field["name"] == "automation_ids")
+    assert checkbox["description"]["suggested_value"] == []
+    result = await flow.async_step_settings(
+        form["data_schema"](
+            {
+                "automations": {"new_automation_ids": "../../invalid"},
+                "dashboards": {},
+                "sensors": {},
+            }
+        )
+    )
+    assert result["errors"] == {"automations": "invalid_automation_id"}
+    sections = {
+        key.schema: value
+        for key, value in result["data_schema"].schema.items()
+        if key.schema in {"automations", "dashboards", "sensors"}
+    }
+    assert sections["automations"].options["collapsed"] is False
+    assert entry.options["automation_ids"] == "morning,new"
