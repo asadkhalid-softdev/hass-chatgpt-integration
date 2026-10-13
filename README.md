@@ -7,12 +7,13 @@ A custom conversation integration that signs in with your **ChatGPT account** an
 ## What it does
 
 - Inspect automation triggers/conditions/actions and dashboard configuration, prepare drafts, and apply or restore them through an administrator review form when separately enabled.
+- Optionally search the internet through OpenAI’s hosted web-search tool and show clickable source citations in Assist. Search starts disabled and depends on model/account eligibility. See the [internet search guide](docs/WEB_SEARCH.md).
 - Discover models available to the authorized ChatGPT account.
 - Answer questions in Assist and retain conversation context through Home Assistant's chat log.
 - Read live home information and control exposed entities when you enable device access: for example lights, supported thermostat settings, and exposed scenes/scripts.
 - Validate OAuth state, PKCE, ID-token signatures, issuer, audience, expiry and nonce. Verify signed access-token identity again on import.
 - Renew tokens with serialized, atomic storage of rotating refresh tokens; provide reauthentication when a session is revoked.
-- Bound each request to 8 sequential tool calls and 180 seconds. Validate tool names, namespaces, argument schemas and duplicate call IDs before executing a response.
+- Bound each turn to 8 accepted tool calls and 180 seconds. HA actions run sequentially; hosted searches execute on OpenAI’s side before their completed output is validated. Validate tool names, namespaces, argument schemas and duplicate call IDs before executing a response.
 
 Optional [configuration administration](docs/ADMINISTRATION.md) can inspect and draft changes to explicitly allowed UI-managed automations and existing storage dashboards. Each change requires administrator review in Configure, with validation, conflict checks and a saved backup. This includes creating automations under IDs you explicitly allow. Package/YAML dashboard editing, integration installation, arbitrary services and shell access are unsupported.
 
@@ -69,6 +70,7 @@ Checked against these official sources during implementation:
 - [OpenAI: registration, OAuth and PKCE](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
 - [OpenAI: self-hosted credential transfer](https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms)
 - [OpenAI: model discovery and Responses inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference)
+- [OpenAI: hosted web search and citations](https://developers.openai.com/api/docs/guides/tools-web-search)
 - [OpenAI: preview API limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations)
 - [OpenAI: refresh and revocation](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)
 - [Home Assistant: conversation entity API](https://developers.home-assistant.io/docs/core/entity/conversation/)

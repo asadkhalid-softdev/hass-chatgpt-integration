@@ -176,3 +176,70 @@ async def test_http_error_object_is_classified():
     assert "subscription_sharing_user_not_eligible" in str(err)
     assert "http=403" in str(err)
     assert "private" not in str(err)
+
+
+async def test_hosted_search_stream_preserves_search_and_citation_output():
+    search = {
+        "type": "web_search_call",
+        "id": "ws_1",
+        "status": "completed",
+        "action": {"type": "search", "query": "public topic"},
+    }
+    message = {
+        "type": "message",
+        "role": "assistant",
+        "content": [
+            {
+                "type": "output_text",
+                "text": "Found a result.",
+                "annotations": [
+                    {
+                        "type": "url_citation",
+                        "start_index": 0,
+                        "end_index": 15,
+                        "url": "https://example.com",
+                        "title": "Example",
+                    }
+                ],
+            }
+        ],
+    }
+    session = Session(
+        [
+            {"type": "response.web_search_call.in_progress", "output_index": 0},
+            {"type": "response.output_item.done", "output_index": 0, "item": search},
+            {"type": "response.output_item.done", "output_index": 1, "item": message},
+            {"type": "response.completed", "response": {"status": "completed", "output": []}},
+        ]
+    )
+    result = await api.response(session, "secret", "model", [], [{"type": "web_search"}])
+    assert result["output"] == [search, message]
+    assert session.payload["tools"] == [{"type": "web_search"}]
+    assert session.payload["store"] is False and session.payload["stream"] is True
+
+
+async def test_failed_search_stream_never_returns_provisional_ha_action():
+    action = {
+        "type": "function_call",
+        "name": "HassTurnOn",
+        "namespace": "home_assistant",
+        "call_id": "ha_call",
+        "arguments": "{}",
+    }
+    session = Session(
+        [
+            {"type": "response.output_item.done", "output_index": 0, "item": action},
+            {
+                "type": "response.failed",
+                "response": {
+                    "error": {
+                        "code": "subscription_sharing_unsupported_capability",
+                        "param": "tools",
+                        "message": "private query",
+                    }
+                },
+            },
+        ]
+    )
+    with pytest.raises(api.ModelError, match="unsupported_capability"):
+        await api.response(session, "secret", "model", [], [{"type": "web_search"}])

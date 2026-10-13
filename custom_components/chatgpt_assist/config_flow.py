@@ -221,6 +221,9 @@ class ChatGPTOptionsFlow(OptionsFlow):
                             "control", default=self.config_entry.options.get("control", False)
                         ): BooleanSelector(),
                         vol.Required(
+                            "web_search", default=self.config_entry.options.get("web_search", False)
+                        ): BooleanSelector(),
+                        vol.Required(
                             "administration", default=self.config_entry.options.get("administration", False)
                         ): BooleanSelector(),
                         vol.Required(

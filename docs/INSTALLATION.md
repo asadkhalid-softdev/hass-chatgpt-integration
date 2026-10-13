@@ -137,3 +137,7 @@ Diagnostics include only model choice, access enabled, version and host ID. Do n
 ## Automation and dashboard configuration
 
 After installation, follow the [configuration administration guide](ADMINISTRATION.md) to enable exact targets, inspect automation triggers, prepare changes, and approve or restore them in Configure. Device control and configuration administration are separate permissions; configuration access starts disabled.
+
+## Internet search
+
+Version 0.3.0 adds an optional **Allow internet search** checkbox under **ChatGPT Assist → Configure → Model and permissions**. It starts disabled and uses your existing account connection. Follow the [internet search guide](WEB_SEARCH.md) for setup, live verification, privacy and unsupported-access recovery.

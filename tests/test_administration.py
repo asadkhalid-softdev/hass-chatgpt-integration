@@ -298,13 +298,15 @@ async def test_administration_chat_rejects_non_admin_before_provider(environment
     provider.assert_not_called()
 
 
-async def test_real_admin_conversation_proposes_without_applying(environment, monkeypatch):
+@pytest.mark.parametrize("web_search", [False, True])
+async def test_real_admin_conversation_proposes_without_applying(environment, monkeypatch, web_search):
     from homeassistant.components import conversation
 
     from custom_components.chatgpt_assist import conversation as agent
     from custom_components.chatgpt_assist.const import NAMESPACE
 
     hass, entry, manager, _, _ = environment
+    entry.options["web_search"] = web_search
     entry.runtime_data.session = None
     entry.runtime_data.access_token = AsyncMock(return_value="fake-access")
     entity = agent.ChatGPTConversation(entry)
@@ -366,6 +368,9 @@ async def test_real_admin_conversation_proposes_without_applying(environment, mo
     returned = json.loads(responses.call_args.args[3][-1]["output"])
     assert returned["status"] == "pending"
     assert "proposal_id" in returned
+    assert [tool["type"] for tool in responses.call_args.args[4]] == (
+        ["namespace", "web_search"] if web_search else ["namespace"]
+    )
 
 
 async def test_approval_without_authenticated_ui_request_is_rejected(environment, monkeypatch):

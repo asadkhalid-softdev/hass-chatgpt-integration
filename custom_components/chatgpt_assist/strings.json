@@ -33,14 +33,15 @@
     "step": {
       "settings": {
         "title": "ChatGPT Assist options",
-        "description": "Device control allows Assist to use exposed entities. Configuration access is separate and requires an authenticated administrator. Check the automations and dashboards the assistant may inspect and draft changes for. Nothing is selected automatically. Saved grants stay checked; reserved or unavailable items can be unchecked to revoke access. YAML dashboards are unsupported. Review every draft before applying.\n\n{discovery_notice}",
+        "description": "Device control allows Assist to use exposed entities. Configuration access is separate and requires an authenticated administrator. Check the automations and dashboards the assistant may inspect and draft changes for. Nothing is selected automatically. Saved grants stay checked; reserved or unavailable items can be unchecked to revoke access. YAML dashboards are unsupported. Internet search uses OpenAI’s hosted tool and depends on your selected model and account/workspace permissions. Search queries are sent outside Home Assistant. Review every draft before applying.\n\n{discovery_notice}",
         "data": {
           "model": "ChatGPT model",
           "control": "Allow reading and controlling exposed entities",
           "administration": "Enable configuration inspection and drafts (administrators only)",
           "automation_ids": "Allowed automations",
           "dashboard_paths": "Allowed dashboards",
-          "new_automation_ids": "Reserve IDs for new automations (optional, comma separated)"
+          "new_automation_ids": "Reserve IDs for new automations (optional, comma separated)",
+          "web_search": "Allow internet search"
         }
       },
       "init": {

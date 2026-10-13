@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- Add opt-in hosted internet search using the existing ChatGPT account grant, independent of device/configuration access.
+- Preserve completed web-search output in conversation history and render safe, clickable inline source citations without changing native provider items.
+- Reject disabled, failed, duplicated or excessive search output before HA tool dispatch; retain sanitized provider errors with actionable search-access guidance and no automatic retry.
+- Document setup, account/model limitations, hosted-query privacy and client-side limits. Test search-only chats, HA tool combinations, configuration drafts, citation safety and streamed search failures on both supported Core versions.
+
 ## 0.2.2
 
 - Populate automation permissions from Core’s loaded automation entities when editor-file discovery fails. Include package/custom-include automations and entries without IDs as read-only selections.

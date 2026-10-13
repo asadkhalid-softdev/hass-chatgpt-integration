@@ -1,4 +1,4 @@
-"""Conversation entity using only HA's exposed-entity Assist API."""
+"""Conversation entity with scoped HA tools and optional hosted internet search."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from .auth import AuthError, ConnectionError
 from .compat import schema as vol
 from .compat import schema_to_json
 from .const import DEFAULT_PROMPT, DOMAIN, MAX_ROUNDS, MAX_TOOL_CALLS, NAMESPACE
+from .web_search import SEARCH_PROMPT, cited_text
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,14 +54,14 @@ def inputs_from_log(chat_log) -> list[dict]:
     return result
 
 
-def parse_output(output: list[dict], allowed: set[str], seen: set[str], remaining: int):
+def parse_output(output: list[dict], allowed: set[str], seen: set[str], remaining: int, *, web_search=False):
     """Validate the entire batch before dispatching any call."""
-    calls, text, batch = [], [], set()
+    calls, text, batch, searches = [], [], set(), set()
     try:
         for item in output:
             kind = item["type"]
             if kind == "message":
-                text.extend(part["text"] for part in item["content"] if part["type"] == "output_text")
+                text.extend(cited_text(part) for part in item["content"] if part["type"] == "output_text")
             elif kind == "function_call":
                 name, call_id = item["name"], item["call_id"]
                 if (
@@ -77,15 +78,29 @@ def parse_output(output: list[dict], allowed: set[str], seen: set[str], remainin
                     raise ValueError
                 calls.append(llm.ToolInput(tool_name=name, tool_args=args, id=call_id))
                 batch.add(call_id)
+            elif kind == "web_search_call":
+                search_id = item.get("id")
+                if (
+                    not web_search
+                    or item.get("status") != "completed"
+                    or not isinstance(search_id, str)
+                    or not search_id
+                    or search_id in seen
+                    or search_id in searches
+                    or not isinstance(item.get("action"), dict)
+                    or item["action"].get("type") not in {"search", "open_page", "find", "find_in_page"}
+                ):
+                    raise ValueError
+                searches.add(search_id)
             elif kind != "reasoning":
                 raise ValueError
-        if len(calls) > min(remaining, 1):
+        if len(calls) > min(remaining, 1) or len(calls) + len(searches) > remaining or batch & searches:
             raise ValueError
     except (KeyError, TypeError, ValueError):
         raise ModelError(
             "ChatGPT returned invalid or excessive tool calls. No actions from this response were run."
         ) from None
-    seen.update(batch)
+    seen.update(batch | searches)
     return "\n".join(text), calls
 
 
@@ -130,7 +145,13 @@ class ChatGPTConversation(conversation.ConversationEntity):
                 return self._error(
                     user_input,
                     chat_log,
-                    str(err) + " If earlier actions ran, check device state before retrying.",
+                    str(err)
+                    + (
+                        " If this started after enabling internet search, disable Allow internet search in Configure or choose another model."
+                        if self.entry.options.get("web_search")
+                        else ""
+                    )
+                    + " If earlier actions ran, check device state before retrying.",
                 )
             except TimeoutError:
                 return self._error(
@@ -162,7 +183,12 @@ class ChatGPTConversation(conversation.ConversationEntity):
                 if self.entry.options.get("control")
                 else None
             ),
-            DEFAULT_PROMPT,
+            DEFAULT_PROMPT
+            + (
+                "\n" + SEARCH_PROMPT
+                if self.entry.options.get("web_search", False)
+                else "\nInternet search is disabled. Do not claim to have performed a new internet lookup."
+            ),
             user_input.extra_system_prompt,
         )
         tools, allowed = [], set()
@@ -187,6 +213,9 @@ class ChatGPTConversation(conversation.ConversationEntity):
                     ],
                 }
             ]
+        search_enabled = self.entry.options.get("web_search", False)
+        if search_enabled:
+            tools.append({"type": "web_search"})
         seen: set[str] = set()
         for _ in range(MAX_ROUNDS):
             account = self.entry.runtime_data
@@ -199,7 +228,9 @@ class ChatGPTConversation(conversation.ConversationEntity):
                     tools,
                 )
             )["output"]
-            text, calls = parse_output(output, allowed, seen, MAX_TOOL_CALLS - len(seen))
+            text, calls = parse_output(
+                output, allowed, seen, MAX_TOOL_CALLS - len(seen), web_search=search_enabled
+            )
             # Validate schemas before any call in the batch executes.
             if calls:
                 try:
