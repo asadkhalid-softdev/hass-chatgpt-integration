@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+- Populate automation permissions from Core’s loaded automation entities when editor-file discovery fails. Include package/custom-include automations and entries without IDs as read-only selections.
+- Inspect original YAML using Core source locations without returning resolved runtime secrets. Preserve secret/include tags as reference metadata; reject outside-directory sources, stale identities, YAML merge aliases and recursive structures.
+- Show specific, sanitized editor-access diagnostics and recognize equivalent standard include paths. Keep edits restricted to supported editor-file entries.
+
 ## 0.2.1
 
 - Replace manual permission IDs with native HA checklists displaying automation names and storage dashboard titles. Preserve legacy grants, including reserved/missing targets, and select no additional resources automatically.

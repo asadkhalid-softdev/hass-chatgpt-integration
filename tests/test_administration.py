@@ -431,6 +431,19 @@ async def test_real_automation_integration_reloads_and_removes_created_automatio
         await manager.apply_from_options(created, reviewer_id=user.id, rollback=True)
         await hass.async_block_till_done()
         assert {entity.unique_id for entity in hass.data[DATA_COMPONENT].entities} == {"probe"}
+        # A different include must still populate the checklist from real loaded entities.
+        (tmp_path / "custom_automations.yaml").write_text(yaml.safe_dump([before]))
+        (tmp_path / "configuration.yaml").write_text("automation: !include custom_automations.yaml\n")
+        await hass.services.async_call(
+            "automation", "reload", blocking=True, context=Context(user_id=user.id)
+        )
+        await hass.async_block_till_done()
+        choices, notice = await manager.choices()
+        assert any(
+            item["value"] == "probe" and "read only" in item["label"] for item in choices["automation"]
+        )
+        assert "editor access is unavailable" in notice
+        assert (await manager.read("automation", "probe"))["alias"] == "Original probe"
     finally:
         await hass.async_stop()
 
@@ -530,7 +543,7 @@ async def test_discovery_failure_preserves_existing_selections_and_explains(envi
     choices, notice = await manager.choices()
     assert {item["value"] for item in choices["automation"]} == {"morning", "new"}
     assert {item["value"] for item in choices["dashboard"]} == {"test-dashboard"}
-    assert "Automation discovery is unavailable" in notice
+    assert "Automation editor access is unavailable" in notice
     assert "Dashboard discovery is unavailable" in notice
 
 
@@ -617,3 +630,116 @@ async def test_empty_catalog_has_no_default_grants_and_explains_next_step(enviro
     assert "No automations" in form["description_placeholders"]["discovery_notice"]
     assert "No storage-mode dashboards" in form["description_placeholders"]["discovery_notice"]
     assert not manager.records
+
+
+async def test_loaded_automation_discovery_and_secret_safe_read_without_standard_include(
+    environment, tmp_path
+):
+    from homeassistant.components.automation import DATA_COMPONENT
+    from homeassistant.util.yaml import Secrets, load_yaml
+
+    hass, entry, manager, _, _ = environment
+    source = tmp_path / "packages" / "lights.yaml"
+    source.parent.mkdir()
+    (tmp_path / "configuration.yaml").write_text("homeassistant:\n  packages: !include_dir_named packages\n")
+    (tmp_path / "secrets.yaml").write_text("webhook: TOP_SECRET_DO_NOT_SEND\n")
+    source.write_text(
+        "automation:\n  - id: package_lights\n    alias: Package lights\n    triggers:\n      - trigger: webhook\n        webhook_id: !secret webhook\n    actions: []\n"
+    )
+    raw = load_yaml(str(source), Secrets(tmp_path))["automation"][0]
+    assert raw["triggers"][0]["webhook_id"] == "TOP_SECRET_DO_NOT_SEND"
+    entity = SimpleNamespace(
+        unique_id="package_lights",
+        entity_id="automation.package_lights",
+        name="Package lights",
+        raw_config=raw,
+    )
+    hass.data[DATA_COMPONENT] = SimpleNamespace(entities=[entity])
+    choices, notice = await manager.choices()
+    choice = next(item for item in choices["automation"] if item["value"] == "package_lights")
+    assert "Package lights" in choice["label"] and "read only" in choice["label"]
+    assert "Only automation:" in notice
+    entry.options["automation_ids"] = ["package_lights"]
+    config = await manager.read("automation", "package_lights")
+    assert config["triggers"][0]["webhook_id"] == {"yaml_tag": "!secret", "reference": "webhook"}
+    assert "TOP_SECRET_DO_NOT_SEND" not in json.dumps(config)
+    with pytest.raises(AdministrationError, match="editing is unavailable"):
+        await manager.propose(
+            "admin", "automation", "package_lights", json.dumps({**config, "alias": "Changed"})
+        )
+    assert not manager.records
+
+
+async def test_loaded_automation_without_id_is_selectable_and_read_only(environment, tmp_path):
+    from homeassistant.components.automation import DATA_COMPONENT
+    from homeassistant.util.yaml import load_yaml
+
+    hass, entry, manager, _, _ = environment
+    source = tmp_path / "package.yaml"
+    source.write_text("automation:\n  - alias: No ID automation\n    triggers: []\n    actions: []\n")
+    raw = load_yaml(str(source))["automation"][0]
+    entity = SimpleNamespace(
+        unique_id=None, entity_id="automation.no_id", name="No ID automation", raw_config=raw
+    )
+    hass.data[DATA_COMPONENT] = SimpleNamespace(entities=[entity])
+    choices, _ = await manager.choices()
+    assert any(item["value"] == "automation.no_id" for item in choices["automation"])
+    entry.options["automation_ids"] = ["automation.no_id"]
+    assert (await manager.read("automation", "automation.no_id"))["alias"] == "No ID automation"
+    with pytest.raises(AdministrationError, match="read only"):
+        await manager.propose(
+            "admin", "automation", "automation.no_id", json.dumps({**raw, "alias": "Changed"})
+        )
+
+
+async def test_source_inspection_rejects_stale_location_and_external_path(environment, tmp_path):
+    from homeassistant.components.automation import DATA_COMPONENT
+    from homeassistant.util.yaml import load_yaml
+
+    hass, entry, manager, _, _ = environment
+    source = tmp_path / "package.yaml"
+    source.write_text("- id: package\n  alias: Original\n  triggers: []\n  actions: []\n")
+    raw = load_yaml(str(source))[0]
+    entity = SimpleNamespace(
+        unique_id="package", entity_id="automation.package", name="Original", raw_config=raw
+    )
+    hass.data[DATA_COMPONENT] = SimpleNamespace(entities=[entity])
+    entry.options["automation_ids"] = ["package"]
+    source.write_text("- id: other\n  alias: Changed\n  triggers: []\n  actions: []\n")
+    with pytest.raises(AdministrationError, match="changed since loading"):
+        await manager.read("automation", "package")
+    raw.__config_file__ = str(tmp_path.parent / "outside.yaml")
+    with pytest.raises(AdministrationError, match="outside"):
+        await manager.read("automation", "package")
+
+
+async def test_equivalent_standard_include_and_non_json_yaml_diagnostics(environment, tmp_path):
+    _, _, manager, _, _ = environment
+    (tmp_path / "configuration.yaml").write_text("automation: !include ./automations.yaml\n")
+    assert (await manager.read("automation", "morning"))["alias"] == "Morning"
+    (tmp_path / "automations.yaml").write_text("- id: morning\n  alias: Morning\n  date: 2026-10-13\n")
+    _, notice = await manager.choices()
+    assert "not JSON compatible" in notice
+
+
+@pytest.mark.parametrize(
+    "unsafe",
+    ["    actions: &loop [*loop]\n", "    actions: []\n    actions: []\n", "    <<: {actions: []}\n"],
+)
+async def test_read_only_source_rejects_ambiguous_or_recursive_yaml(environment, tmp_path, unsafe):
+    from homeassistant.components.automation import DATA_COMPONENT
+    from homeassistant.util.yaml import load_yaml
+
+    hass, entry, manager, _, _ = environment
+    source = tmp_path / "package.yaml"
+    header = "automation:\n  - id: package\n    alias: Package\n"
+    source.write_text(header + "    actions: []\n")
+    raw = load_yaml(str(source))["automation"][0]
+    entity = SimpleNamespace(
+        unique_id="package", entity_id="automation.package", name="Package", raw_config=raw
+    )
+    hass.data[DATA_COMPONENT] = SimpleNamespace(entities=[entity])
+    entry.options["automation_ids"] = ["package"]
+    source.write_text(header + unsafe)
+    with pytest.raises(AdministrationError):
+        await manager.read("automation", "package")

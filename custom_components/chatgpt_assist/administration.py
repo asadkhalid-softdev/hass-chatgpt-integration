@@ -81,7 +81,9 @@ class Administration:
     def permitted(self, kind, target):
         if kind not in {"automation", "dashboard"} or target not in scopes(self.entry.options, kind):
             raise AdministrationError("This configuration target is not allowed in integration options.")
-        if kind == "automation" and not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", target):
+        if kind == "automation" and not re.fullmatch(
+            r"(?:[A-Za-z0-9_-]{1,128}|automation\.[a-z0-9_]+)", target
+        ):
             raise AdministrationError("Use an automation configuration ID, not an entity ID or path.")
 
     def _automation_file(self):
@@ -92,8 +94,10 @@ class Administration:
         tree = yaml.compose(root.read_text(encoding="utf-8"))
         if not isinstance(tree, yaml.MappingNode) or not any(
             str(key.value).split(" ")[0] == "automation"
+            and isinstance(value, yaml.ScalarNode)
             and value.tag == "!include"
-            and value.value == "automations.yaml"
+            and Path(self.hass.config.path(value.value)).resolve()
+            == Path(self.hass.config.path("automations.yaml")).resolve()
             for key, value in tree.value
         ):
             raise AdministrationError("Only automation: !include automations.yaml is supported.")
@@ -123,6 +127,141 @@ class Administration:
             raise AdministrationError("Select an existing storage-mode dashboard; YAML is unsupported.")
         return dashboard
 
+    def _loaded_automations(self):
+        """Use the same live entities that HA's automation configuration API uses."""
+        from homeassistant.components.automation import DATA_COMPONENT
+
+        component = self.hass.data.get(DATA_COMPONENT)
+        result = {}
+        for entity in component.entities if component else ():
+            identifier = str(entity.unique_id or "")
+            target = identifier if re.fullmatch(r"[A-Za-z0-9_-]{1,128}", identifier) else entity.entity_id
+            result[target] = entity
+        return result
+
+    @staticmethod
+    def _file_error(error):
+        if isinstance(error, AdministrationError):
+            return str(error)
+        if isinstance(error, FileNotFoundError):
+            return "The standard configuration or automation editor file was not found."
+        if isinstance(error, PermissionError):
+            return "Home Assistant cannot read the automation editor file."
+        if isinstance(error, yaml.YAMLError):
+            return "The editor file contains YAML tags (such as !secret or !include), or invalid YAML. Editing this file is unsupported."
+        if isinstance(error, (TypeError, ValueError)):
+            return "The editor file contains values that are not JSON compatible. Editing this file is unsupported."
+        return "The automation editor file could not be read."
+
+    def _read_source(self, entity):
+        """Read the original YAML node, retaining tags rather than resolving secrets.
+
+        The file/line comes only from Core's loaded configuration, never tool arguments.
+        Runtime raw_config may already contain resolved secrets and is not returned.
+        """
+        raw = getattr(entity, "_blueprint_inputs", None) or entity.raw_config
+        filename, line = getattr(raw, "__config_file__", None), getattr(raw, "__line__", None)
+        anchor_key = None
+        # Core copies the top-level mapping into dict(), but annotated ID/alias
+        # strings retain their original file and line references.
+        if not filename and isinstance(raw, dict):
+            for key in ("id", "alias"):
+                value = raw.get(key)
+                if source := getattr(value, "__config_file__", None):
+                    filename, line, anchor_key = source, getattr(value, "__line__", None), key
+                    break
+        if not filename or not isinstance(line, int):
+            raise AdministrationError(
+                "The loaded automation has no source location. Inspect its YAML in Home Assistant."
+            )
+        root = Path(self.hass.config.path()).resolve()
+        path = Path(filename)
+        path = (path if path.is_absolute() else root / path).resolve()
+        if not path.is_relative_to(root) or path.stat().st_size > 2_000_000:
+            raise AdministrationError(
+                "The automation source is outside the supported configuration directory or exceeds the size limit."
+            )
+        tree = yaml.compose(path.read_text(encoding="utf-8"))
+        seen = set()
+
+        def locate(node):
+            if id(node) in seen:
+                return None
+            seen.add(id(node))
+            if isinstance(node, yaml.MappingNode):
+                if anchor_key is None and node.start_mark.line + 1 == line:
+                    return node
+                if anchor_key and any(
+                    isinstance(key, yaml.ScalarNode)
+                    and key.value == anchor_key
+                    and child.start_mark.line + 1 == line
+                    for key, child in node.value
+                ):
+                    return node
+                children = [child for _, child in node.value]
+            elif isinstance(node, yaml.SequenceNode):
+                children = node.value
+            else:
+                children = []
+            for child in children:
+                if found := locate(child):
+                    return found
+            return None
+
+        node = locate(tree)
+        if node is None:
+            raise AdministrationError(
+                "The automation source changed since loading. Reload automations before inspecting it."
+            )
+        visiting = set()
+        count = 0
+
+        def convert(value):
+            nonlocal count
+            count += 1
+            if count > 10_000 or id(value) in visiting:
+                raise AdministrationError(
+                    "The automation source contains unsupported recursive or excessive YAML aliases."
+                )
+            visiting.add(id(value))
+            try:
+                if value.tag.startswith("!"):
+                    return {
+                        "yaml_tag": value.tag,
+                        "reference": value.value if isinstance(value, yaml.ScalarNode) else "[tagged value]",
+                    }
+                if isinstance(value, yaml.MappingNode):
+                    result = {}
+                    for key, child in value.value:
+                        if not isinstance(key, yaml.ScalarNode) or key.value in result or key.value == "<<":
+                            raise AdministrationError(
+                                "Duplicate YAML keys or merge aliases are unsupported for inspection."
+                            )
+                        result[key.value] = convert(child)
+                    return result
+                if isinstance(value, yaml.SequenceNode):
+                    return [convert(child) for child in value.value]
+                if value.tag in {
+                    "tag:yaml.org,2002:bool",
+                    "tag:yaml.org,2002:int",
+                    "tag:yaml.org,2002:float",
+                    "tag:yaml.org,2002:null",
+                }:
+                    return yaml.SafeLoader("").construct_object(value, deep=True)
+                return value.value
+            finally:
+                visiting.remove(id(value))
+
+        config = convert(node)
+        # Refuse a stale line pointing to a different automation after external edits.
+        if config.get("id") != raw.get("id") or config.get("alias") != raw.get("alias"):
+            raise AdministrationError(
+                "The automation source changed since loading. Reload automations before inspecting it."
+            )
+        if len(encode(config).encode()) > MAX_CONFIG:
+            raise AdministrationError("Automation configuration exceeds 64 KB.")
+        return config
+
     async def choices(self):
         """Discover local names for administrator permission selection, never grant them."""
         from homeassistant.components.lovelace.const import LOVELACE_DATA
@@ -132,15 +271,9 @@ class Administration:
         notices = []
         try:
             _, automations = await self.hass.async_add_executor_job(self._automation_file)
-        except Exception:
-            notices.append(
-                "Automation discovery is unavailable. Only the standard automations.yaml editor file is supported; check that file and its configuration include."
-            )
+        except Exception as err:
+            notices.append("Automation editor access is unavailable. " + self._file_error(err))
         else:
-            if not automations:
-                notices.append(
-                    "No automations were found in the editor file. You can create one in Home Assistant or reserve a new ID below."
-                )
             for config in automations:
                 target = str(config.get("id", ""))
                 if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", target):
@@ -148,6 +281,13 @@ class Administration:
                 name = str(config.get("alias") or "Unnamed automation")
                 suffix = " · blueprint (read only)" if "use_blueprint" in config else ""
                 choices["automation"][target] = f"{name} · {target}{suffix}"
+        for target, entity in self._loaded_automations().items():
+            if target not in choices["automation"]:
+                choices["automation"][target] = f"{entity.name or entity.entity_id} · {target} · read only"
+        if not choices["automation"]:
+            notices.append(
+                "No automations with configuration access were found. Wait for HA to finish loading, or create an automation in its editor."
+            )
         data = self.hass.data.get(LOVELACE_DATA)
         if data is None:
             notices.append("Dashboard discovery is unavailable until Home Assistant loads its dashboards.")
@@ -187,8 +327,15 @@ class Administration:
     async def read(self, kind, target):
         self.permitted(kind, target)
         if kind == "automation":
-            _, values = await self.hass.async_add_executor_job(self._automation_file)
+            try:
+                _, values = await self.hass.async_add_executor_job(self._automation_file)
+            except Exception as err:
+                if entity := self._loaded_automations().get(target):
+                    return await self.hass.async_add_executor_job(self._read_source, entity)
+                raise AdministrationError(self._file_error(err)) from None
             config = next((copy.deepcopy(v) for v in values if str(v.get("id")) == target), None)
+            if config is None and (entity := self._loaded_automations().get(target)):
+                return await self.hass.async_add_executor_job(self._read_source, entity)
             if len(encode(config).encode()) > MAX_CONFIG:
                 raise AdministrationError("Automation configuration exceeds 64 KB.")
             return config
@@ -209,6 +356,17 @@ class Administration:
         if not isinstance(config, dict) or len(encode(config).encode()) > MAX_CONFIG:
             raise AdministrationError("Configuration must be a JSON object smaller than 64 KB.")
         if kind == "automation":
+            try:
+                _, editor_configs = await self.hass.async_add_executor_job(self._automation_file)
+            except Exception as err:
+                raise AdministrationError(
+                    "Automation editing is unavailable. " + self._file_error(err)
+                ) from None
+            if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", target) or (
+                target in self._loaded_automations()
+                and not any(str(item.get("id")) == target for item in editor_configs)
+            ):
+                raise AdministrationError("This automation is read only. Edit its source in Home Assistant.")
             if config.get("id", target) != target or "use_blueprint" in config:
                 raise AdministrationError(
                     "Keep the automation ID unchanged. Blueprint edits are unsupported."
