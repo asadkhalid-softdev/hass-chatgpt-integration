@@ -1,7 +1,7 @@
 {
   "domain": "chatgpt_assist",
   "name": "ChatGPT Assist",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "config_flow": true,
   "dependencies": [
     "conversation",
@@ -12,5 +12,8 @@
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "codeowners": [],
-  "documentation": "https://developers.openai.com/siwc/token-sharing-open-source"
+  "documentation": "https://developers.openai.com/siwc/token-sharing-open-source",
+  "after_dependencies": [
+    "recorder"
+  ]
 }

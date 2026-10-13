@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0
+
+- Add separately permissioned, read-only sensor history with a named sensor checklist and Select all / Select none controls. History can be enabled without device control or configuration drafting.
+- Add scoped history discovery and Recorder reads for recent raw readings and longer hourly/daily statistics, with explicit timezone-aware intervals, bounded results and missing/truncated data markers.
+- Check the authenticated user's entity permissions before querying and after database reads; prevent forwarding old history tool results after grants are revoked.
+- Add history setup and privacy documentation plus Core conversation, permission and SQLite Recorder tests.
+
 ## 0.4.1
 
 - Add Select all / Select none checkboxes for automation and dashboard permissions. Submit refreshes the selections for review; a second submission saves explicit grants. Bulk controls never grant future discoveries.

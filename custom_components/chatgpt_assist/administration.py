@@ -615,7 +615,7 @@ class ConfigurationAPI(llm.API):
     """Per-entry tools; never register administration globally with Assist or MCP."""
 
     def __init__(self, hass, entry):
-        self.id, self.name = f"{DOMAIN}_{entry.entry_id}", "ChatGPT configuration"
+        self.id, self.name = f"{DOMAIN}_{entry.entry_id}", "ChatGPT Home Assistant tools"
         self.hass, self.entry = hass, entry
 
     async def async_get_api_instance(self, llm_context):
@@ -623,14 +623,26 @@ class ConfigurationAPI(llm.API):
         if self.entry.options.get("control"):
             instance = await llm.async_get_api(self.hass, llm.LLM_API_ASSIST, llm_context)
         tools = list(instance.tools) if instance else []
-        tools.extend(
-            ConfigurationTool(self.entry.runtime_data.administration, op)
-            for op in ("list", "read", "propose", "status")
-        )
+        if self.entry.options.get("administration"):
+            tools.extend(
+                ConfigurationTool(self.entry.runtime_data.administration, op)
+                for op in ("list", "read", "propose", "status")
+            )
+        history_prompt = ""
+        if self.entry.options.get("history_access"):
+            from .history import PROMPT as HISTORY_PROMPT
+            from .history import HistoryAccess, HistoryTool
+
+            access = HistoryAccess(self.hass, self.entry)
+            tools.extend(HistoryTool(access, op) for op in ("list", "read"))
+            history_prompt = "\n" + HISTORY_PROMPT + f"\nHome Assistant local timezone: {self.hass.config.time_zone}."
+
         return llm.APIInstance(
             api=self,
             llm_context=llm_context,
             tools=tools,
-            api_prompt=(instance.api_prompt if instance else "") + "\n" + PROMPT,
+            api_prompt=(instance.api_prompt if instance else "")
+            + ("\n" + PROMPT if self.entry.options.get("administration") else "")
+            + history_prompt,
             custom_serializer=instance.custom_serializer if instance else llm.selector_serializer,
         )

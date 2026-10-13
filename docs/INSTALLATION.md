@@ -145,3 +145,7 @@ Version 0.3.0 adds an optional **Allow internet search** checkbox under **ChatGP
 ## Sidebar chatbot
 
 Version 0.4.0 automatically adds **ChatGPT Assist** to the sidebar when an account is loaded. After updating in HACS, restart HA and refresh your browser tab so it loads the new frontend. Follow the [sidebar chat guide](SIDEBAR_CHAT.md) for history, sending and clearing.
+
+### Sensor history
+
+Version 0.5.0 adds a separate **Allow read-only sensor history** switch and **Allowed sensors for history** checklist in **Configure → Model and permissions**. Enable it and choose sensors before asking about past readings. See the [history guide](HISTORY.md).

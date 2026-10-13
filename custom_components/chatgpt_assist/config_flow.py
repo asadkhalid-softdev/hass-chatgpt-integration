@@ -26,6 +26,7 @@ from .api import ModelError, available_models
 from .auth import AuthError, ConnectionError, validate_import
 from .compat import schema as vol
 from .const import DOMAIN
+from .history import choices as history_choices
 
 CREDENTIAL_SCHEMA = vol.Schema(
     {vol.Required("credentials"): TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))}
@@ -187,9 +188,11 @@ class ChatGPTOptionsFlow(OptionsFlow):
     async def async_step_settings(self, user_input=None):
         errors = {}
         choices, notice = await self.config_entry.runtime_data.administration.choices()
+        choices["history"] = history_choices(self.hass, self.config_entry.options)
         bulk_fields = {
             "automation_ids": ("select_all_automations", "select_none_automations", "automation"),
             "dashboard_paths": ("select_all_dashboards", "select_none_dashboards", "dashboard"),
+            "history_entity_ids": ("select_all_history", "select_none_history", "history"),
         }
         bulk_requested = False
         if user_input is not None:
@@ -221,6 +224,7 @@ class ChatGPTOptionsFlow(OptionsFlow):
                 options.pop("new_automation_ids", None)
                 options["automation_ids"] = sorted(scopes(options, "automation") | set(reserved))
                 options["dashboard_paths"] = sorted(scopes(options, "dashboard"))
+                options["history_entity_ids"] = sorted(set(options.get("history_entity_ids", [])))
                 return self.async_create_entry(title="", data=options)
         try:
             token = await self.config_entry.runtime_data.access_token()
@@ -266,6 +270,16 @@ class ChatGPTOptionsFlow(OptionsFlow):
                             )
                         ),
                         vol.Optional("new_automation_ids", default=""): TextSelector(),
+                        vol.Required(
+                            "history_access", default=self.config_entry.options.get("history_access", False)
+                        ): BooleanSelector(),
+                        vol.Optional("select_all_history", default=False): BooleanSelector(),
+                        vol.Optional("select_none_history", default=False): BooleanSelector(),
+                        vol.Required(
+                            "history_entity_ids", default=self.config_entry.options.get("history_entity_ids", [])
+                        ): SelectSelector(SelectSelectorConfig(
+                            options=choices["history"], multiple=True, mode=SelectSelectorMode.LIST
+                        )),
                     }
                 ),
                 user_input or {},

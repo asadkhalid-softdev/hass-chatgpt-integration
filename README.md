@@ -80,3 +80,7 @@ Checked against these official sources during implementation:
 - [Home Assistant: LLM and Assist API boundaries](https://developers.home-assistant.io/docs/core/llm/)
 
 MIT licensed. The accompanying open-source license is part of the intended OSS deployment.
+
+## Sensor history
+
+Opt in to read-only temperature, humidity and other sensor history under **Configure → Model and permissions**. Choose allowed sensors using checklists or Select all/none. History works independently of device control and configuration drafts. See the [history guide](docs/HISTORY.md) for setup, example questions and retention/query limits.

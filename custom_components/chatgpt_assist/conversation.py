@@ -174,11 +174,28 @@ class ChatGPTConversation(conversation.ConversationEntity):
                 await self.entry.runtime_data.administration.authorize(user_input.context.user_id)
             except AdministrationError as err:
                 return self._error(user_input, chat_log, str(err))
+        # Do not resend historical readings after access or entity permissions are revoked.
+        if self.entry.options.get("history_access") or any(
+            isinstance(item, conversation.ToolResultContent) and item.tool_name.startswith("history_")
+            for item in chat_log.content
+        ):
+            from .history import HistoryAccess, HistoryError
+
+            access = HistoryAccess(self.hass, self.entry)
+            try:
+                await access.authorize(user_input.context.user_id)
+                for item in chat_log.content:
+                    if isinstance(item, conversation.ToolResultContent) and item.tool_name.startswith("history_"):
+                        data = item.result.data if hasattr(item, "result") else item.tool_result
+                        if isinstance(data, dict):
+                            await access.authorize(user_input.context.user_id, data.get("entity_ids", []))
+            except HistoryError as err:
+                return self._error(user_input, chat_log, str(err) + " Clear message history before retrying.")
         await chat_log.async_provide_llm_data(
             user_input.as_llm_context(DOMAIN),
             (
                 ConfigurationAPI(self.hass, self.entry)
-                if self.entry.options.get("administration")
+                if self.entry.options.get("administration") or self.entry.options.get("history_access")
                 else [llm.LLM_API_ASSIST]
                 if self.entry.options.get("control")
                 else None
@@ -198,7 +215,7 @@ class ChatGPTConversation(conversation.ConversationEntity):
                 {
                     "type": "namespace",
                     "name": NAMESPACE,
-                    "description": "Home Assistant device tools and administrator configuration drafts.",
+                    "description": "Home Assistant device tools, read-only sensor history and administrator configuration drafts.",
                     "tools": [
                         {
                             "type": "function",
