@@ -33,13 +33,14 @@
     "step": {
       "settings": {
         "title": "ChatGPT Assist options",
-        "description": "Device control grants the built-in Assist API access to exposed entities. Review Settings → Voice assistants → Expose before enabling. Exposed scripts can have broader effects. Configuration administration is separate, disabled by default, and restricted to authenticated administrators. Grant exact targets as comma-separated lists. Review changes before applying.",
+        "description": "Device control allows Assist to use exposed entities. Configuration access is separate and requires an authenticated administrator. Check the automations and dashboards the assistant may inspect and draft changes for. Nothing is selected automatically. Saved grants stay checked; reserved or unavailable items can be unchecked to revoke access. YAML dashboards are unsupported. Review every draft before applying.\n\n{discovery_notice}",
         "data": {
           "model": "ChatGPT model",
           "control": "Allow reading and controlling exposed entities",
           "administration": "Enable configuration inspection and drafts (administrators only)",
-          "automation_ids": "Allowed automation configuration IDs (comma separated; new IDs allow creation)",
-          "dashboard_paths": "Allowed existing storage dashboard URL paths (comma separated; <default> for the legacy default)"
+          "automation_ids": "Allowed automations",
+          "dashboard_paths": "Allowed dashboards",
+          "new_automation_ids": "Reserve IDs for new automations (optional, comma separated)"
         }
       },
       "init": {
@@ -67,7 +68,8 @@
     },
     "error": {
       "cannot_connect": "Could not refresh the account model list. The existing model is shown.",
-      "administration_failed": "The operation could not be completed. See the explanation above."
+      "administration_failed": "The operation could not be completed. See the explanation above.",
+      "invalid_automation_id": "Use letters, numbers, underscores or hyphens for each new automation ID (maximum 128 characters)."
     },
     "abort": {
       "no_proposals": "No saved proposals are available. Ask the assistant to prepare a configuration change first.",

@@ -468,3 +468,152 @@ async def test_disabling_administration_does_not_resend_sensitive_history(enviro
     result = await entity._handle(user, SimpleNamespace(conversation_id="private", content=[history]))
     assert result.response.response_type.value == "error"
     provider.assert_not_called()
+
+
+async def test_permissions_checklists_discover_names_and_preserve_grants(environment, monkeypatch):
+    from custom_components.chatgpt_assist import config_flow as flow_module
+
+    hass, entry, manager, _, _ = environment
+    entry.runtime_data.access_token = AsyncMock(return_value="fake")
+    manager._dashboard("test-dashboard").config["title"] = "Family dashboard"
+    # A missing dashboard remains visible rather than silently losing its permission.
+    entry.options["dashboard_paths"] += ",missing-dashboard"
+    monkeypatch.setattr(
+        flow_module, "available_models", AsyncMock(return_value=[{"value": "test", "label": "Test"}])
+    )
+    monkeypatch.setattr(flow_module, "async_get_clientsession", lambda hass: None)
+    monkeypatch.setattr(ChatGPTOptionsFlow, "config_entry", property(lambda self: entry))
+    flow = ChatGPTOptionsFlow()
+    flow.hass = hass
+    form = await flow.async_step_settings()
+    defaults = form["data_schema"]({})
+    assert defaults["automation_ids"] == ["morning", "new"]
+    assert defaults["dashboard_paths"] == ["missing-dashboard", "test-dashboard"]
+    # Validate the actual form schema and inspect Core's serialized select selectors.
+    schema = schema_to_json(form["data_schema"], custom_serializer=llm.selector_serializer)
+    json.dumps(schema)
+    fields = {key.schema: value for key, value in form["data_schema"].schema.items()}
+    automations = fields["automation_ids"].config
+    dashboards = fields["dashboard_paths"].config
+    assert automations["mode"] == "list" and automations["multiple"] is True
+    assert dashboards["mode"] == "list" and dashboards["multiple"] is True
+    assert {item["value"]: item["label"] for item in automations["options"]} == {
+        "morning": "Morning · morning",
+        "new": "Reserved or unavailable automation · new",
+    }
+    assert "Family dashboard" in next(
+        item["label"] for item in dashboards["options"] if item["value"] == "test-dashboard"
+    )
+    saved = await flow.async_step_settings(
+        form["data_schema"](
+            {
+                "model": "test",
+                "control": False,
+                "administration": True,
+                "automation_ids": ["morning"],
+                "dashboard_paths": [],
+                "new_automation_ids": "future_lights",
+            }
+        )
+    )
+    assert saved["data"]["automation_ids"] == ["future_lights", "morning"]
+    assert saved["data"]["dashboard_paths"] == []
+    assert "new_automation_ids" not in saved["data"]
+    with pytest.raises(vol.Invalid):
+        form["data_schema"]({"automation_ids": ["not-discovered-or-granted"]})
+
+
+async def test_discovery_failure_preserves_existing_selections_and_explains(environment, tmp_path):
+    hass, _, manager, _, _ = environment
+    (tmp_path / "automations.yaml").write_text("bad: structure\n")
+    hass.data.pop(LOVELACE_DATA)
+    choices, notice = await manager.choices()
+    assert {item["value"] for item in choices["automation"]} == {"morning", "new"}
+    assert {item["value"] for item in choices["dashboard"]} == {"test-dashboard"}
+    assert "Automation discovery is unavailable" in notice
+    assert "Dashboard discovery is unavailable" in notice
+
+
+@pytest.mark.parametrize("stored", [" morning, new ", ["morning", "new"], ["morning", " new ", "morning"]])
+async def test_legacy_and_list_permissions_enforce_same_targets(environment, stored):
+    _, entry, manager, _, _ = environment
+    entry.options["automation_ids"] = stored
+    manager.permitted("automation", "morning")
+    manager.permitted("automation", "new")
+    with pytest.raises(AdministrationError):
+        manager.permitted("automation", "unselected")
+
+
+async def test_discovered_items_are_not_automatically_granted_or_shared(environment, tmp_path):
+    hass, entry, manager, before, _ = environment
+    (tmp_path / "automations.yaml").write_text(
+        yaml.safe_dump([before, {**before, "id": "private", "alias": "Private automation"}])
+    )
+    choices, _ = await manager.choices()
+    assert "private" in {item["value"] for item in choices["automation"]}
+    with pytest.raises(AdministrationError):
+        manager.permitted("automation", "private")
+    tool = ConfigurationTool(manager, "list")
+    context = llm.LLMContext(
+        platform="chatgpt_assist",
+        context=Context(user_id="admin"),
+        language="en",
+        assistant="conversation.test",
+        device_id=None,
+    )
+    result = await tool.async_call(hass, llm.ToolInput(tool_name=tool.name, tool_args={}), context)
+    data = result.data if hasattr(result, "data") else result
+    assert data["names"]["automation"]["morning"] == "Morning · morning"
+    assert "Private automation" not in json.dumps(data)
+    assert "private" not in data["automation"]
+
+
+async def test_invalid_creation_id_keeps_settings_form_open(environment, monkeypatch):
+    from custom_components.chatgpt_assist import config_flow as flow_module
+
+    hass, entry, _, _, _ = environment
+    entry.runtime_data.access_token = AsyncMock(return_value="fake")
+    monkeypatch.setattr(
+        flow_module, "available_models", AsyncMock(return_value=[{"value": "test", "label": "Test"}])
+    )
+    monkeypatch.setattr(flow_module, "async_get_clientsession", lambda hass: None)
+    monkeypatch.setattr(ChatGPTOptionsFlow, "config_entry", property(lambda self: entry))
+    flow = ChatGPTOptionsFlow()
+    flow.hass = hass
+    result = await flow.async_step_settings(
+        {
+            "model": "test",
+            "control": False,
+            "administration": True,
+            "automation_ids": ["morning"],
+            "dashboard_paths": [],
+            "new_automation_ids": "../../bad",
+        }
+    )
+    assert result["errors"]["new_automation_ids"] == "invalid_automation_id"
+    assert entry.options["automation_ids"] == "morning,new"
+
+
+async def test_empty_catalog_has_no_default_grants_and_explains_next_step(environment, tmp_path, monkeypatch):
+    from custom_components.chatgpt_assist import config_flow as flow_module
+
+    hass, entry, manager, _, _ = environment
+    entry.options.pop("automation_ids")
+    entry.options.pop("dashboard_paths")
+    (tmp_path / "automations.yaml").write_text("[]\n")
+    hass.data[LOVELACE_DATA].dashboards.clear()
+    entry.runtime_data.access_token = AsyncMock(return_value="fake")
+    monkeypatch.setattr(
+        flow_module, "available_models", AsyncMock(return_value=[{"value": "test", "label": "Test"}])
+    )
+    monkeypatch.setattr(flow_module, "async_get_clientsession", lambda hass: None)
+    monkeypatch.setattr(ChatGPTOptionsFlow, "config_entry", property(lambda self: entry))
+    flow = ChatGPTOptionsFlow()
+    flow.hass = hass
+    form = await flow.async_step_settings()
+    defaults = form["data_schema"]({})
+    assert defaults["automation_ids"] == []
+    assert defaults["dashboard_paths"] == []
+    assert "No automations" in form["description_placeholders"]["discovery_notice"]
+    assert "No storage-mode dashboards" in form["description_placeholders"]["discovery_notice"]
+    assert not manager.records

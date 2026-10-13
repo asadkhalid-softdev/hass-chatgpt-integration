@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Replace manual permission IDs with native HA checklists displaying automation names and storage dashboard titles. Preserve legacy grants, including reserved/missing targets, and select no additional resources automatically.
+- Keep new automation reservations as a separate optional field, validate IDs, and explain unavailable discovery in the permissions form.
+- Include names of allowed targets in the assistant configuration-list tool so users can refer to their selections by name.
+
 ## 0.2.0
 
 - Add opt-in administrator configuration tools for exact allowed automation IDs and storage dashboard paths. Read full saved definitions, validate replacement drafts, and report proposal status.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from uuid import uuid4
 
 from homeassistant.config_entries import ConfigFlow, OptionsFlow
@@ -13,13 +14,14 @@ from homeassistant.helpers.selector import (
     BooleanSelector,
     SelectSelector,
     SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
 )
 from homeassistant.helpers.storage import Store
 
-from .administration import AdministrationError
+from .administration import AdministrationError, scopes
 from .api import ModelError, available_models
 from .auth import AuthError, ConnectionError, validate_import
 from .compat import schema as vol
@@ -183,9 +185,22 @@ class ChatGPTOptionsFlow(OptionsFlow):
         )
 
     async def async_step_settings(self, user_input=None):
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
         errors = {}
+        if user_input is not None:
+            reserved = [
+                value.strip()
+                for value in user_input.get("new_automation_ids", "").split(",")
+                if value.strip()
+            ]
+            if any(not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", value) for value in reserved):
+                errors["new_automation_ids"] = "invalid_automation_id"
+            else:
+                options = dict(user_input)
+                options.pop("new_automation_ids", None)
+                options["automation_ids"] = sorted(scopes(options, "automation") | set(reserved))
+                options["dashboard_paths"] = sorted(scopes(options, "dashboard"))
+                return self.async_create_entry(title="", data=options)
+        choices, notice = await self.config_entry.runtime_data.administration.choices()
         try:
             token = await self.config_entry.runtime_data.access_token()
             models = await available_models(async_get_clientsession(self.hass), token)
@@ -196,24 +211,37 @@ class ChatGPTOptionsFlow(OptionsFlow):
             ]
         return self.async_show_form(
             step_id="settings",
-            data_schema=vol.Schema(
-                {
-                    vol.Required("model", default=self.config_entry.options["model"]): SelectSelector(
-                        SelectSelectorConfig(options=models)
-                    ),
-                    vol.Required(
-                        "control", default=self.config_entry.options.get("control", False)
-                    ): BooleanSelector(),
-                    vol.Required(
-                        "administration", default=self.config_entry.options.get("administration", False)
-                    ): BooleanSelector(),
-                    vol.Required(
-                        "automation_ids", default=self.config_entry.options.get("automation_ids", "")
-                    ): TextSelector(),
-                    vol.Required(
-                        "dashboard_paths", default=self.config_entry.options.get("dashboard_paths", "")
-                    ): TextSelector(),
-                }
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema(
+                    {
+                        vol.Required("model", default=self.config_entry.options["model"]): SelectSelector(
+                            SelectSelectorConfig(options=models)
+                        ),
+                        vol.Required(
+                            "control", default=self.config_entry.options.get("control", False)
+                        ): BooleanSelector(),
+                        vol.Required(
+                            "administration", default=self.config_entry.options.get("administration", False)
+                        ): BooleanSelector(),
+                        vol.Required(
+                            "automation_ids", default=sorted(scopes(self.config_entry.options, "automation"))
+                        ): SelectSelector(
+                            SelectSelectorConfig(
+                                options=choices["automation"], multiple=True, mode=SelectSelectorMode.LIST
+                            )
+                        ),
+                        vol.Required(
+                            "dashboard_paths", default=sorted(scopes(self.config_entry.options, "dashboard"))
+                        ): SelectSelector(
+                            SelectSelectorConfig(
+                                options=choices["dashboard"], multiple=True, mode=SelectSelectorMode.LIST
+                            )
+                        ),
+                        vol.Optional("new_automation_ids", default=""): TextSelector(),
+                    }
+                ),
+                user_input or {},
             ),
             errors=errors,
+            description_placeholders={"discovery_notice": notice},
         )

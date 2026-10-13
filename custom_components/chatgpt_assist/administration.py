@@ -51,7 +51,12 @@ def digest(value):
 
 def scopes(options, kind):
     key = "automation_ids" if kind == "automation" else "dashboard_paths"
-    return {item.strip() for item in options.get(key, "").split(",") if item.strip()}
+    values = options.get(key, [])
+    if isinstance(values, str):
+        values = values.split(",")
+    if not isinstance(values, (list, tuple)):
+        return set()
+    return {item.strip() for item in values if isinstance(item, str) and item.strip()}
 
 
 class Administration:
@@ -117,6 +122,67 @@ class Administration:
         if not isinstance(dashboard, LovelaceStorage):
             raise AdministrationError("Select an existing storage-mode dashboard; YAML is unsupported.")
         return dashboard
+
+    async def choices(self):
+        """Discover local names for administrator permission selection, never grant them."""
+        from homeassistant.components.lovelace.const import LOVELACE_DATA
+        from homeassistant.components.lovelace.dashboard import LovelaceStorage
+
+        choices = {"automation": {}, "dashboard": {}}
+        notices = []
+        try:
+            _, automations = await self.hass.async_add_executor_job(self._automation_file)
+        except Exception:
+            notices.append(
+                "Automation discovery is unavailable. Only the standard automations.yaml editor file is supported; check that file and its configuration include."
+            )
+        else:
+            if not automations:
+                notices.append(
+                    "No automations were found in the editor file. You can create one in Home Assistant or reserve a new ID below."
+                )
+            for config in automations:
+                target = str(config.get("id", ""))
+                if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", target):
+                    continue
+                name = str(config.get("alias") or "Unnamed automation")
+                suffix = " · blueprint (read only)" if "use_blueprint" in config else ""
+                choices["automation"][target] = f"{name} · {target}{suffix}"
+        data = self.hass.data.get(LOVELACE_DATA)
+        if data is None:
+            notices.append("Dashboard discovery is unavailable until Home Assistant loads its dashboards.")
+        else:
+            for path, dashboard in data.dashboards.items():
+                if not isinstance(dashboard, LovelaceStorage):
+                    continue
+                target = "<default>" if path is None else path
+                config = dashboard.config or {}
+                title = str(config.get("title") or ("Overview" if path in {None, "lovelace"} else path))
+                choices["dashboard"][target] = f"{title} · {target}"
+            if not choices["dashboard"]:
+                notices.append(
+                    "No storage-mode dashboards were found. Create one in Home Assistant to enable dashboard access; YAML dashboards are unsupported."
+                )
+        # Preserve saved selections even when a resource is missing or discovery fails.
+        # Administrators can see and revoke those grants without silently losing them.
+        for kind in choices:
+            for target in scopes(self.entry.options, kind):
+                choices[kind].setdefault(
+                    target,
+                    f"Reserved or unavailable automation · {target}"
+                    if kind == "automation"
+                    else f"Unavailable dashboard · {target}",
+                )
+        return (
+            {
+                kind: [
+                    {"value": target, "label": label}
+                    for target, label in sorted(items.items(), key=lambda item: (item[1].casefold(), item[0]))
+                ]
+                for kind, items in choices.items()
+            },
+            "\n\n".join(notices),
+        )
 
     async def read(self, kind, target):
         self.permitted(kind, target)
@@ -327,7 +393,7 @@ class ConfigurationTool(llm.Tool):
         self.manager, self.operation = manager, operation
         self.name = f"configuration_{operation}"
         self.description = {
-            "list": "List explicitly allowed automation configuration IDs and dashboard paths.",
+            "list": "List names and IDs of explicitly allowed automations and dashboards.",
             "read": "Read a complete allowed automation (including triggers) or storage dashboard configuration.",
             "propose": "Validate and save a complete replacement JSON draft. A human admin must approve in Configure. This never applies changes.",
             "status": "Read proposal status. Does not approve or execute anything.",
@@ -358,8 +424,17 @@ class ConfigurationTool(llm.Tool):
             await self.manager.authorize(user_id)
             args = tool_input.tool_args
             if self.operation == "list":
+                choices, _ = await self.manager.choices()
                 result = {
                     kind: sorted(scopes(self.manager.entry.options, kind))
+                    for kind in ("automation", "dashboard")
+                }
+                result["names"] = {
+                    kind: {
+                        item["value"]: item["label"]
+                        for item in choices[kind]
+                        if item["value"] in scopes(self.manager.entry.options, kind)
+                    }
                     for kind in ("automation", "dashboard")
                 }
             elif self.operation == "read":

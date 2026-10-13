@@ -7,9 +7,13 @@ Version 0.2.0 adds opt-in configuration tools. The assistant can read complete a
 1. Update ChatGPT Assist in HACS and restart Home Assistant. If HACS does not offer an update, open its ChatGPT Assist page, use the menu to **Redownload**, select the current version/default branch, and restart.
 2. Open **Settings → Devices & services → ChatGPT Assist → Configure → Model and permissions**.
 3. Enable **configuration inspection and drafts**. This permission is separate from exposed-device control.
-4. Enter exact **automation configuration IDs**, separated by commas. These are the `id` values in `automations.yaml`, also used in the automation editor URL (`/config/automation/edit/<id>`). They are not `automation.morning` entity IDs. Example: `1700000000000,weekday_morning`. To permit creating an automation, include a new ID such as `ai_morning_lights` here first.
-5. Enter exact **existing storage dashboard URL paths**, separated by commas, such as `dashboard-home,dashboard-energy`. Find the path in the dashboard URL, before its view path. Older installations can use `<default>` for the legacy default dashboard. For the current Overview dashboard, use its actual registered path, often `lovelace`.
+4. Check the **Allowed automations** you want to grant access to. The checklist displays each automation's name and configuration ID; blueprint entries are marked read-only. Only supported entries in the standard automation editor file are listed. You do not need to find or type IDs for existing automations.
+5. Check the **Allowed dashboards** by title. Only existing storage-mode dashboards are listed. Saved grants stay selected, including reserved or unavailable entries, so updates do not silently change permissions. Uncheck an item to revoke its access. If discovery cannot run, the form explains why and preserves previous selections.
 6. Save. Start a new Assist conversation while signed into HA as an administrator.
+
+To authorize creation of a new automation, optionally enter an ID such as `ai_morning_lights` in **Reserve IDs for new automations**. Separate multiple IDs with commas; use letters, numbers, underscores or hyphens. The IDs join your saved selections and appear as reserved entries in the checklist until created. Leave this field empty when selecting existing automations.
+
+Versions before 0.2.1 stored comma-separated grants. They remain valid and are displayed as preselected checklist entries; saving converts them to lists without granting additional targets.
 
 There is no wildcard access. Empty lists grant no configuration targets. When configuration administration is enabled, this conversation agent is restricted to active, authenticated administrators to keep configuration conversation history private. Non-administrator, inactive, system-generated and unidentified requests are rejected before contacting the model. Voice requests from satellites without a user identity cannot administer configuration. Existing Assist device controls retain their normal exposure rules. Keep configuration administration disabled on an assistant intended for household members or unidentified satellites.
 
