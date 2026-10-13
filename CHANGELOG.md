@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.1.2
+
+- Consume complete OAuth, JWKS and model-list HTTP bodies before parsing JSON, keeping a strict response-size limit. Add real split-response transport tests and safe network/parse error codes.
 
 - Report safe JWT verification failure codes without exposing tokens or account claims, so live sign-in failures can be diagnosed without weakening verification.
 

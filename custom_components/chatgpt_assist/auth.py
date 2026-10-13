@@ -79,8 +79,12 @@ def check_callback(attempt: dict, query: dict[str, str]) -> tuple[str, str]:
     return query["code"], client_id
 
 
+MAX_AUTH_RESPONSE_BYTES = 1_000_000
+
+
 async def request_json(session: aiohttp.ClientSession, method: str, url: str, **kwargs: Any) -> dict:
     """Call a fixed HTTPS endpoint without redirects or credential-bearing errors."""
+    service = "signing-key" if url == JWKS_URL else "token" if url == TOKEN_URL else "OpenAI"
     try:
         async with session.request(
             method, url, allow_redirects=False, timeout=aiohttp.ClientTimeout(total=30), **kwargs
@@ -89,15 +93,27 @@ async def request_json(session: aiohttp.ClientSession, method: str, url: str, **
                 raise AuthError("Authorization failed. Sign in again or check plan permissions.")
             if response.status != 200:
                 raise ConnectionError("The authentication service is unavailable.")
-            raw = await response.content.read(1_000_001)
-            if len(raw) > 1_000_000:
-                raise ConnectionError("Authentication response was too large.")
+            # read(n) can return a partial body even when n exceeds the total size.
+            # Consume chunks to EOF, rejecting the response before it exceeds the cap.
+            raw = bytearray()
+            async for chunk in response.content.iter_chunked(64 * 1024):
+                if len(raw) + len(chunk) > MAX_AUTH_RESPONSE_BYTES:
+                    raise ConnectionError(
+                        f"The {service} response exceeded the size limit [response_too_large]."
+                    )
+                raw.extend(chunk)
             data = json.loads(raw)
             if not isinstance(data, dict):
                 raise ValueError
             return data
-    except (aiohttp.ClientError, TimeoutError, ValueError):
-        raise ConnectionError("Could not read the authentication service response.") from None
+    except TimeoutError:
+        raise ConnectionError(f"The {service} request timed out [timeout]. Sign in again.") from None
+    except aiohttp.ClientError:
+        raise ConnectionError(
+            f"Could not read the {service} response [network_error]. Check the connection and sign in again."
+        ) from None
+    except (ValueError, UnicodeError):
+        raise ConnectionError(f"The {service} service returned an invalid response [invalid_json].") from None
 
 
 async def verify_jwt(
