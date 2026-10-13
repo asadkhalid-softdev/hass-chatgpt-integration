@@ -16,6 +16,7 @@ from homeassistant.helpers.storage import Store
 from .administration import Administration
 from .auth import AuthError, ConnectionError, request_json, token_record
 from .const import API_URL, DOMAIN, TOKEN_URL
+from .panel import PANEL_KEY, PanelError, async_setup_panel, async_unload_panel
 
 PLATFORMS = [Platform.CONVERSATION]
 
@@ -91,6 +92,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ChatGPTConfigEntry) -> b
     except ConnectionError as err:
         raise ConfigEntryNotReady(str(err)) from None
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    try:
+        await async_setup_panel(hass, entry)
+    except PanelError as err:
+        await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+        raise ConfigEntryNotReady(str(err)) from None
     entry.async_on_unload(entry.add_update_listener(_updated))
     return True
 
@@ -103,11 +109,16 @@ async def _updated(hass: HomeAssistant, entry: ChatGPTConfigEntry) -> None:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ChatGPTConfigEntry) -> bool:
     """Unload entities; session is owned by HA."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded:
+        async_unload_panel(hass, entry.entry_id)
+    return unloaded
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ChatGPTConfigEntry) -> None:
     """Revoke the renewable grant when an account is removed."""
+    if backend := hass.data.get(PANEL_KEY):
+        await backend.remove_entry(entry.entry_id)
     session = async_get_clientsession(hass)
     store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.tokens")
     saved = await store.async_load()

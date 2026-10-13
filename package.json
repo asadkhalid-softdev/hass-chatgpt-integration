@@ -1,0 +1,6 @@
+{
+  "name": "hass-chatgpt-integration-panel-tests",
+  "private": true,
+  "scripts": {"test:panel": "node --test tests/frontend/panel.test.mjs"},
+  "devDependencies": {"playwright": "1.64.0"}
+}

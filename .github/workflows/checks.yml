@@ -29,3 +29,23 @@ jobs:
       - run: python -m pip install -r scripts/requirements.txt pytest pytest-asyncio
       - run: python -m pytest -q tests/test_login_storage.py tests/test_auth_transport.py
       - run: python scripts/chatgpt_login.py --help
+
+  panel-browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:panel
+        env:
+          PANEL_DESKTOP_SCREENSHOT: test-results/desktop.png
+          PANEL_MOBILE_SCREENSHOT: test-results/mobile.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sidebar-panel-screenshots
+          path: test-results/

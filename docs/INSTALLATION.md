@@ -141,3 +141,7 @@ After installation, follow the [configuration administration guide](ADMINISTRATI
 ## Internet search
 
 Version 0.3.0 adds an optional **Allow internet search** checkbox under **ChatGPT Assist → Configure → Model and permissions**. It starts disabled and uses your existing account connection. Follow the [internet search guide](WEB_SEARCH.md) for setup, live verification, privacy and unsupported-access recovery.
+
+## Sidebar chatbot
+
+Version 0.4.0 automatically adds **ChatGPT Assist** to the sidebar when an account is loaded. After updating in HACS, restart HA and refresh your browser tab so it loads the new frontend. Follow the [sidebar chat guide](SIDEBAR_CHAT.md) for history, sending and clearing.

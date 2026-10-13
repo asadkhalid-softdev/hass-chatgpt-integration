@@ -6,3 +6,6 @@ __pycache__/
 credentials*.json
 chatgpt-account*.json
 *.zip
+
+node_modules/
+test-results/

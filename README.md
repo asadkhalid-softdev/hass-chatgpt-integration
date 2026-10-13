@@ -8,6 +8,7 @@ A custom conversation integration that signs in with your **ChatGPT account** an
 
 - Inspect automation triggers/conditions/actions and dashboard configuration, prepare drafts, and apply or restore them through an administrator review form when separately enabled.
 - Optionally search the internet through OpenAI’s hosted web-search tool and show clickable source citations in Assist. Search starts disabled and depends on model/account eligibility. See the [internet search guide](docs/WEB_SEARCH.md).
+- Open **ChatGPT Assist** from the sidebar for a dedicated chat with private per-user history, Enter to send, Shift+Enter for new lines, and a **Clear message history** menu option. See the [sidebar chat guide](docs/SIDEBAR_CHAT.md).
 - Discover models available to the authorized ChatGPT account.
 - Answer questions in Assist and retain conversation context through Home Assistant's chat log.
 - Read live home information and control exposed entities when you enable device access: for example lights, supported thermostat settings, and exposed scenes/scripts.
@@ -59,6 +60,8 @@ uv pip install --python .venv/bin/python -r requirements-dev.txt
 .venv/bin/ruff check custom_components scripts tests
 .venv/bin/ruff format --check custom_components scripts tests
 ```
+
+The sidebar frontend is served locally with no runtime JavaScript dependencies. Browser checks use development-only Playwright: `npm ci`, `npx playwright install chromium`, then `npm run test:panel`. On WSL mounted Windows drives that disallow symlinks, use `npm ci --no-bin-links` and `node node_modules/playwright/cli.js install chromium`.
 
 CI tests both Core versions; `requirements-dev-current.txt` provides the 2026.10.1 test environment. Tests verify OAuth rejection paths, signed JWT validation, grant permissions, import identity, refresh serialization, protected files, failed/incomplete SSE streams, protocol limits and real HA chat-log dispatch with the original user context. Automated network tests use mocked or local responses. Separately, live GPT-6.1 Sol text inference and a synthetic function-call round trip have passed; real HA device commands remain unverified. [Live verification checklist](docs/INSTALLATION.md#verify-your-installation) covers installation and exposure checks.
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+- Add a locally served ChatGPT Assist sidebar panel with themed desktop/mobile chat, message history, reply indicator, citations, code blocks, copying and account selection. Enter sends; Shift+Enter inserts a newline and IME composition does not submit.
+- Add an authenticated, per-user/per-account history backend with bounded private storage and restoration of native conversation context after reload/expiry. No OAuth credentials are sent to the browser.
+- Add Clear message history in the chat menu with confirmation. Clear removes the selected user’s persisted messages and active Core conversation context; no New conversation button is shown.
+- Prevent duplicate delivery, concurrent turns/clear and cross-user or unauthorized administrator-history access. Register one sidebar panel and remove it when the last account unloads.
+- Add real Core backend tests and Chromium interaction/security/layout tests, plus browser checks in CI.
+
 ## 0.3.0
 
 - Add opt-in hosted internet search using the existing ChatGPT account grant, independent of device/configuration access.
