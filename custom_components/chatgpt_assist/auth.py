@@ -96,7 +96,7 @@ async def request_json(session: aiohttp.ClientSession, method: str, url: str, **
             if not isinstance(data, dict):
                 raise ValueError
             return data
-    except aiohttp.ClientError, TimeoutError, ValueError:
+    except (aiohttp.ClientError, TimeoutError, ValueError):
         raise ConnectionError("Could not read the authentication service response.") from None
 
 
@@ -122,7 +122,7 @@ async def verify_jwt(
         if nonce is not None and not secrets.compare_digest(str(claims.get("nonce", "")), nonce):
             raise ValueError
         return claims
-    except jwt.PyJWTError, ValueError, KeyError, StopIteration, TypeError:
+    except (jwt.PyJWTError, ValueError, KeyError, StopIteration, TypeError):
         raise AuthError("The signed account token could not be verified.") from None
 
 
@@ -154,7 +154,7 @@ def token_record(
         ):
             raise ValueError
         return record
-    except KeyError, TypeError, ValueError, AttributeError:
+    except (KeyError, TypeError, ValueError, AttributeError):
         raise AuthError("The grant is incomplete or ChatGPT plan access was not granted.") from None
 
 
@@ -211,5 +211,5 @@ async def validate_import(session: aiohttp.ClientSession, record: dict) -> dict:
         # ID token may expire before access import; access token provides signed identity.
         clean["email"] = "ChatGPT account"
         return clean
-    except KeyError, TypeError:
+    except (KeyError, TypeError):
         raise AuthError("The credential file is incomplete.") from None

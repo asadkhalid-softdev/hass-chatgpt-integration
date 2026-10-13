@@ -132,7 +132,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ChatGPTConfigEntry) -> 
         ) as response:
             if response.status == 200:
                 return
-    except AuthError, ConnectionError, TimeoutError:
+    except (AuthError, ConnectionError, TimeoutError):
         pass
     except aiohttp.ClientError:
         pass

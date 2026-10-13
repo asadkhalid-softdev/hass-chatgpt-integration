@@ -19,7 +19,7 @@ Back up your HA configuration. Copy the directory so that this exact file exists
 
 `/config` is the usual HA OS directory or the configuration volume mounted into HA Container. If you use a different config directory, use that path instead. Copy **only** the `chatgpt_assist` directory into `custom_components`, without another enclosing repository directory. Copy all its Python and translation files.
 
-Restart Home Assistant. No `configuration.yaml` changes are needed. HA installs the pinned dependencies itself. HACS metadata is included, but this repository has not been published or registered in HACS; use the manual installation above.
+Restart Home Assistant. No `configuration.yaml` changes are needed. The integration uses JWT, cryptography and schema libraries already supplied by Home Assistant. It does not install separate pinned copies. For HACS, add `https://github.com/asadkhalid-softdev/hass-chatgpt-integration` under Custom repositories with type Integration, download ChatGPT Assist, then restart HA. If updating to 0.1.1 after the config-flow dependency error, use HACS Redownload to fetch the latest main branch and restart HA before trying Add integration again.
 
 ## 2. Complete ChatGPT OAuth on your browser's computer
 

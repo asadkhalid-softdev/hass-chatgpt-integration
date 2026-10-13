@@ -52,7 +52,7 @@ async def sse_events(content: Any) -> AsyncIterator[dict]:
                         yield event
             elif line.startswith("data:"):
                 data.append(line[5:].lstrip(" "))
-        except UnicodeError, ValueError:
+        except (UnicodeError, ValueError):
             raise ModelError("The model returned an invalid stream.") from None
 
 
@@ -97,7 +97,7 @@ async def response(
                         raise ModelError("ChatGPT returned an invalid completed response.")
                     return completed
             raise ModelError("ChatGPT disconnected before completing the request.")
-    except aiohttp.ClientError, TimeoutError, ValueError:
+    except (aiohttp.ClientError, TimeoutError, ValueError):
         raise ConnectionError(
             "Could not reach ChatGPT. Actions may already have completed; check device state before retrying."
         ) from None

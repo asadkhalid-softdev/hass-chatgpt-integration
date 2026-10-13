@@ -144,7 +144,7 @@ def main():
         parser.exit(1, "Sign-in timed out. Run the helper again.\n")
     except KeyboardInterrupt:
         parser.exit(1, "Sign-in cancelled.\n")
-    except ValueError, OSError, KeyError:
+    except (ValueError, OSError, KeyError):
         parser.exit(1, "Could not read or save local credentials. Check the output path and permissions.\n")
 
 

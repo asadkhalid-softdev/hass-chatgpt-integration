@@ -71,7 +71,7 @@ def parse_output(output: list[dict], allowed: set[str], seen: set[str], remainin
                 raise ValueError
         if len(calls) > min(remaining, 1):
             raise ValueError
-    except KeyError, TypeError, ValueError:
+    except (KeyError, TypeError, ValueError):
         raise ModelError(
             "ChatGPT returned invalid or excessive tool calls. No actions from this response were run."
         ) from None
@@ -113,7 +113,7 @@ class ChatGPTConversation(conversation.ConversationEntity):
                 return self._error(
                     user_input, chat_log, "ChatGPT session expired. Reauthenticate ChatGPT Assist."
                 )
-            except ConnectionError, ModelError, TimeoutError:
+            except (ConnectionError, ModelError, TimeoutError):
                 return self._error(
                     user_input,
                     chat_log,

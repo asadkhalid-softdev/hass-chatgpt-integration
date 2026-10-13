@@ -67,7 +67,7 @@ class ChatGPTFlow(ConfigFlow, domain=DOMAIN):
                 self.models = await available_models(
                     async_get_clientsession(self.hass), self.record["access_token"]
                 )
-            except ValueError, AuthError:
+            except (ValueError, AuthError):
                 errors["base"] = "invalid_auth"
             except ConnectionError:
                 errors["base"] = "cannot_connect"
@@ -119,7 +119,7 @@ class ChatGPTOptionsFlow(OptionsFlow):
         try:
             token = await self.config_entry.runtime_data.access_token()
             models = await available_models(async_get_clientsession(self.hass), token)
-        except ConnectionError, AuthError, ModelError:
+        except (ConnectionError, AuthError, ModelError):
             errors["base"] = "cannot_connect"
             models = [
                 {"value": self.config_entry.options["model"], "label": self.config_entry.options["model"]}
