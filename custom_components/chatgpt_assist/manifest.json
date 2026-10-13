@@ -1,0 +1,12 @@
+{
+  "domain": "chatgpt_assist",
+  "name": "ChatGPT Assist",
+  "version": "0.1.0",
+  "config_flow": true,
+  "dependencies": ["conversation"],
+  "requirements": ["PyJWT[crypto]==2.10.1", "voluptuous-openapi==0.2.0"],
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "codeowners": [],
+  "documentation": "https://developers.openai.com/siwc/token-sharing-open-source"
+}

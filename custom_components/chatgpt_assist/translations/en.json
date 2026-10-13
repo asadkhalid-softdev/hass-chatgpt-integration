@@ -1,0 +1,47 @@
+{
+  "title": "ChatGPT Assist",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Continue with ChatGPT",
+        "description": "Run scripts/chatgpt_login.py on the computer running your browser. Sign in to ChatGPT and authorize plan usage, then paste the protected credential file JSON here. Use HTTPS to access Home Assistant. Credentials are saved locally by Home Assistant. See the installation guide for details.",
+        "data": {
+          "credentials": "Protected credential file JSON"
+        }
+      },
+      "model": {
+        "title": "Choose a ChatGPT model",
+        "description": "Models come from your account. Device access starts disabled. Enable it later in the integration options.",
+        "data": {
+          "model": "Model"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Credentials are invalid, expired, or lack ChatGPT plan permissions. Run the sign-in helper again.",
+      "cannot_connect": "Cannot connect to OpenAI. Check internet access and try again.",
+      "no_models": "No eligible models returned. Check ChatGPT account and workspace permissions.",
+      "invalid_model": "Select an available model."
+    },
+    "abort": {
+      "already_configured": "This account registration is already configured.",
+      "wrong_account": "Sign in with the same ChatGPT account and issued client ID.",
+      "reauth_successful": "ChatGPT account reauthenticated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "ChatGPT Assist options",
+        "description": "Device control grants the built-in Assist API access to exposed entities. Review Settings \u2192 Voice assistants \u2192 Expose before enabling. Exposed scripts can have broader effects.",
+        "data": {
+          "model": "ChatGPT model",
+          "control": "Allow reading and controlling exposed entities"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not refresh the account model list. The existing model is shown."
+    }
+  }
+}
