@@ -33,7 +33,7 @@
     "step": {
       "settings": {
         "title": "ChatGPT Assist options",
-        "description": "Device control allows Assist to use exposed entities. Configuration access is separate and requires an authenticated administrator. Check the automations and dashboards the assistant may inspect and draft changes for. Nothing is selected automatically. Saved grants stay checked; reserved or unavailable items can be unchecked to revoke access. YAML dashboards are unsupported. Internet search uses OpenAI’s hosted tool and depends on your selected model and account/workspace permissions. Search queries are sent outside Home Assistant. Review every draft before applying.\n\n{discovery_notice}",
+        "description": "Device control allows Assist to use exposed entities. Configuration access is separate and requires an authenticated administrator. Check the automations and dashboards the assistant may inspect and draft changes for. Nothing is selected automatically. To select all or none, check one bulk option for that list and press Submit to refresh the checkboxes. Review the selections, then Submit again to save. Select all includes every listed entry, including reserved or unavailable grants, but never future discoveries. Select none for automations also clears new ID reservations. Saved grants stay checked; reserved or unavailable items can be unchecked to revoke access. YAML dashboards are unsupported. Internet search uses OpenAI\u2019s hosted tool and depends on your selected model and account/workspace permissions. Search queries are sent outside Home Assistant. Review every draft before applying.\n\n{discovery_notice}",
         "data": {
           "model": "ChatGPT model",
           "control": "Allow reading and controlling exposed entities",
@@ -41,7 +41,11 @@
           "automation_ids": "Allowed automations",
           "dashboard_paths": "Allowed dashboards",
           "new_automation_ids": "Reserve IDs for new automations (optional, comma separated)",
-          "web_search": "Allow internet search"
+          "web_search": "Allow internet search",
+          "select_all_automations": "Select all listed automations",
+          "select_none_automations": "Select none (automations)",
+          "select_all_dashboards": "Select all listed dashboards",
+          "select_none_dashboards": "Select none (dashboards)"
         }
       },
       "init": {
@@ -70,7 +74,8 @@
     "error": {
       "cannot_connect": "Could not refresh the account model list. The existing model is shown.",
       "administration_failed": "The operation could not be completed. See the explanation above.",
-      "invalid_automation_id": "Use letters, numbers, underscores or hyphens for each new automation ID (maximum 128 characters)."
+      "invalid_automation_id": "Use letters, numbers, underscores or hyphens for each new automation ID (maximum 128 characters).",
+      "conflicting_bulk_selection": "Choose either Select all or Select none for this list, then submit again."
     },
     "abort": {
       "no_proposals": "No saved proposals are available. Ask the assistant to prepare a configuration change first.",

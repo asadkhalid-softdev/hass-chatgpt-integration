@@ -748,3 +748,83 @@ async def test_read_only_source_rejects_ambiguous_or_recursive_yaml(environment,
     source.write_text(header + unsafe)
     with pytest.raises(AdministrationError):
         await manager.read("automation", "package")
+
+
+@pytest.mark.parametrize(
+    ("automation_action", "dashboard_action", "expected_automations", "expected_dashboards"),
+    [
+        ("all", "all", ["morning", "new"], ["test-dashboard"]),
+        ("none", "none", [], []),
+        ("all", "none", ["morning", "new"], []),
+        ("none", "all", [], ["test-dashboard"]),
+    ],
+)
+async def test_bulk_permissions_are_reviewed_before_saving(
+    environment, monkeypatch, automation_action, dashboard_action,
+    expected_automations, expected_dashboards,
+):
+    from custom_components.chatgpt_assist import config_flow as flow_module
+
+    hass, entry, _, _, _ = environment
+    entry.runtime_data.access_token = AsyncMock(return_value="fake")
+    monkeypatch.setattr(
+        flow_module, "available_models", AsyncMock(return_value=[{"value": "test", "label": "Test"}])
+    )
+    monkeypatch.setattr(flow_module, "async_get_clientsession", lambda hass: None)
+    monkeypatch.setattr(ChatGPTOptionsFlow, "config_entry", property(lambda self: entry))
+    flow = ChatGPTOptionsFlow()
+    flow.hass = hass
+    form = await flow.async_step_settings()
+    submitted = form["data_schema"]({
+        "model": "test", "control": True, "web_search": True, "administration": True,
+        "automation_ids": [], "dashboard_paths": [], "new_automation_ids": "future_lights",
+        f"select_{automation_action}_automations": True,
+        f"select_{dashboard_action}_dashboards": True,
+    })
+    result = await flow.async_step_settings(submitted)
+    assert result["type"] == "form"
+    assert result["errors"] == {}
+    # Suggested values are what the frontend checks when redisplaying a form.
+    suggested = {
+        key.schema: key.description["suggested_value"]
+        for key in result["data_schema"].schema
+        if key.description and "suggested_value" in key.description
+    }
+    assert suggested["automation_ids"] == expected_automations
+    assert suggested["dashboard_paths"] == expected_dashboards
+    assert suggested["control"] is True and suggested["web_search"] is True
+    assert suggested["new_automation_ids"] == ("" if automation_action == "none" else "future_lights")
+    assert not any(name.startswith("select_") for name in suggested)
+    assert entry.options["automation_ids"] == "morning,new"
+    # The user may narrow the refreshed selections before saving.
+    suggested["automation_ids"] = expected_automations[:1]
+    saved = await flow.async_step_settings(result["data_schema"](suggested))
+    reserved = [] if automation_action == "none" else ["future_lights"]
+    assert saved["data"]["automation_ids"] == sorted(expected_automations[:1] + reserved)
+    assert saved["data"]["dashboard_paths"] == expected_dashboards
+    assert not any(name.startswith("select_") for name in saved["data"])
+
+
+async def test_conflicting_bulk_permissions_keep_form_and_existing_grants(environment, monkeypatch):
+    from custom_components.chatgpt_assist import config_flow as flow_module
+
+    hass, entry, _, _, _ = environment
+    entry.runtime_data.access_token = AsyncMock(return_value="fake")
+    monkeypatch.setattr(
+        flow_module, "available_models", AsyncMock(return_value=[{"value": "test", "label": "Test"}])
+    )
+    monkeypatch.setattr(flow_module, "async_get_clientsession", lambda hass: None)
+    monkeypatch.setattr(ChatGPTOptionsFlow, "config_entry", property(lambda self: entry))
+    flow = ChatGPTOptionsFlow()
+    flow.hass = hass
+    result = await flow.async_step_settings({
+        "model": "test", "automation_ids": ["morning"], "dashboard_paths": [],
+        "select_all_automations": True, "select_none_automations": True,
+        "select_all_dashboards": True, "select_none_dashboards": True,
+    })
+    assert result["errors"] == {
+        "select_none_automations": "conflicting_bulk_selection",
+        "select_none_dashboards": "conflicting_bulk_selection",
+    }
+    assert entry.options["automation_ids"] == "morning,new"
+    assert entry.options["dashboard_paths"] == "test-dashboard"

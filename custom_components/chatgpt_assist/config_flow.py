@@ -186,7 +186,29 @@ class ChatGPTOptionsFlow(OptionsFlow):
 
     async def async_step_settings(self, user_input=None):
         errors = {}
+        choices, notice = await self.config_entry.runtime_data.administration.choices()
+        bulk_fields = {
+            "automation_ids": ("select_all_automations", "select_none_automations", "automation"),
+            "dashboard_paths": ("select_all_dashboards", "select_none_dashboards", "dashboard"),
+        }
+        bulk_requested = False
         if user_input is not None:
+            user_input = dict(user_input)
+            for field, (select_all, select_none, kind) in bulk_fields.items():
+                if user_input.get(select_all) and user_input.get(select_none):
+                    errors[select_none] = "conflicting_bulk_selection"
+                elif user_input.get(select_all) or user_input.get(select_none):
+                    bulk_requested = True
+                    user_input[field] = (
+                        sorted(item["value"] for item in choices[kind])
+                        if user_input.get(select_all) else []
+                    )
+                    if kind == "automation" and user_input.get(select_none):
+                        user_input["new_automation_ids"] = ""
+            if not errors:
+                for select_all, select_none, _ in bulk_fields.values():
+                    user_input.pop(select_all, None)
+                    user_input.pop(select_none, None)
             reserved = [
                 value.strip()
                 for value in user_input.get("new_automation_ids", "").split(",")
@@ -194,13 +216,12 @@ class ChatGPTOptionsFlow(OptionsFlow):
             ]
             if any(not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", value) for value in reserved):
                 errors["new_automation_ids"] = "invalid_automation_id"
-            else:
+            elif not errors and not bulk_requested:
                 options = dict(user_input)
                 options.pop("new_automation_ids", None)
                 options["automation_ids"] = sorted(scopes(options, "automation") | set(reserved))
                 options["dashboard_paths"] = sorted(scopes(options, "dashboard"))
                 return self.async_create_entry(title="", data=options)
-        choices, notice = await self.config_entry.runtime_data.administration.choices()
         try:
             token = await self.config_entry.runtime_data.access_token()
             models = await available_models(async_get_clientsession(self.hass), token)
@@ -226,6 +247,8 @@ class ChatGPTOptionsFlow(OptionsFlow):
                         vol.Required(
                             "administration", default=self.config_entry.options.get("administration", False)
                         ): BooleanSelector(),
+                        vol.Optional("select_all_automations", default=False): BooleanSelector(),
+                        vol.Optional("select_none_automations", default=False): BooleanSelector(),
                         vol.Required(
                             "automation_ids", default=sorted(scopes(self.config_entry.options, "automation"))
                         ): SelectSelector(
@@ -233,6 +256,8 @@ class ChatGPTOptionsFlow(OptionsFlow):
                                 options=choices["automation"], multiple=True, mode=SelectSelectorMode.LIST
                             )
                         ),
+                        vol.Optional("select_all_dashboards", default=False): BooleanSelector(),
+                        vol.Optional("select_none_dashboards", default=False): BooleanSelector(),
                         vol.Required(
                             "dashboard_paths", default=sorted(scopes(self.config_entry.options, "dashboard"))
                         ): SelectSelector(

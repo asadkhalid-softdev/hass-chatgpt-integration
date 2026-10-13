@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+
+- Add Select all / Select none checkboxes for automation and dashboard permissions. Submit refreshes the selections for review; a second submission saves explicit grants. Bulk controls never grant future discoveries.
+- Clear new automation ID reservations when selecting no automations, and reject conflicting bulk controls.
+
 ## 0.4.0
 
 - Add a locally served ChatGPT Assist sidebar panel with themed desktop/mobile chat, message history, reply indicator, citations, code blocks, copying and account selection. Enter sends; Shift+Enter inserts a newline and IME composition does not submit.
