@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.5
+
+- Fix completed ChatGPT plan requests returning no answer: collect `response.output_item.done` events when the terminal `response.completed` event contains an empty output list.
+- Keep collected output provisional until completion succeeds. Failed/incomplete/disconnected streams still cannot dispatch tools, and missing output indices are rejected.
+- Report sanitized request and protocol errors in Assist instead of replacing every failure with one generic message.
+- Verify live GPT-6.1 Sol text inference and a synthetic namespaced function-call round trip. Test both supported Core versions with 70 automated checks.
+
 ## 0.1.4
 
 - Fix requests failing with `TypeError: Object of type _Unsupported is not JSON serializable` when Assist's probatio schemas were passed to the legacy voluptuous converter.

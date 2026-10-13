@@ -85,8 +85,20 @@ async def response(
                 raise ModelError("ChatGPT usage limit reached. Check ChatGPT Settings → Usage.")
             if result.status != 200:
                 raise ModelError("ChatGPT rejected the request or is unavailable.")
+            output_items: dict[int, dict] = {}
             async for event in sse_events(result.content):
                 kind = event.get("type")
+                if kind == "response.output_item.done":
+                    index, item = event.get("output_index"), event.get("item")
+                    if (
+                        type(index) is not int
+                        or not 0 <= index < 128
+                        or not isinstance(item, dict)
+                        or not isinstance(item.get("type"), str)
+                        or (index in output_items and output_items[index] != item)
+                    ):
+                        raise ModelError("ChatGPT returned invalid streamed output [invalid_output_item].")
+                    output_items[index] = item
                 if kind in ("error", "response.failed", "response.incomplete"):
                     raise ModelError("ChatGPT did not complete the request. Check plan access and usage.")
                 if kind == "response.completed":
@@ -95,6 +107,15 @@ async def response(
                         completed.get("output"), list
                     ):
                         raise ModelError("ChatGPT returned an invalid completed response.")
+                    # The ChatGPT plan route may omit output from its terminal event.
+                    # Complete item events carry the text, function calls and encrypted
+                    # reasoning. Keep them provisional until response.completed arrives.
+                    if not completed["output"] and output_items:
+                        if sorted(output_items) != list(range(len(output_items))):
+                            raise ModelError(
+                                "ChatGPT returned incomplete streamed output [missing_output_item]."
+                            )
+                        completed = {**completed, "output": [output_items[i] for i in sorted(output_items)]}
                     return completed
             raise ModelError("ChatGPT disconnected before completing the request.")
     except (aiohttp.ClientError, TimeoutError, ValueError):

@@ -119,12 +119,19 @@ class ChatGPTConversation(conversation.ConversationEntity):
                 return self._error(
                     user_input, chat_log, "ChatGPT session expired. Reauthenticate ChatGPT Assist."
                 )
-            except (ConnectionError, ModelError, TimeoutError):
+            except (ConnectionError, ModelError) as err:
+                # These integration errors contain only sanitized messages, never raw
+                # provider response bodies, prompts, credentials or tool arguments.
                 return self._error(
                     user_input,
                     chat_log,
-                    "ChatGPT could not complete this request. Some requested actions may already have completed; "
-                    "check device state before retrying. Check ChatGPT plan access and usage, or start a new conversation.",
+                    str(err) + " If earlier actions ran, check device state before retrying.",
+                )
+            except TimeoutError:
+                return self._error(
+                    user_input,
+                    chat_log,
+                    "ChatGPT timed out [turn_timeout]. Check device state before retrying.",
                 )
 
     async def _handle(self, user_input, chat_log):

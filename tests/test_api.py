@@ -71,3 +71,35 @@ async def test_size_limit(monkeypatch):
     monkeypatch.setattr(api, "MAX_RESPONSE_BYTES", 8)
     with pytest.raises(api.ModelError):
         await api.response(Session([{"type": "response.completed"}]), "secret", "model", [], [])
+
+
+async def test_terminal_empty_output_uses_completed_items_in_order():
+    message = {"type": "message", "role": "assistant", "content": [{"type": "output_text", "text": "Hello"}]}
+    reasoning = {"type": "reasoning", "summary": [], "encrypted_content": "opaque"}
+    session = Session(
+        [
+            {"type": "response.output_item.done", "output_index": 1, "item": message},
+            {"type": "response.output_item.done", "output_index": 0, "item": reasoning},
+            {"type": "response.completed", "response": {"status": "completed", "output": []}},
+        ]
+    )
+    assert (await api.response(session, "secret", "model", [], []))["output"] == [reasoning, message]
+
+
+@pytest.mark.parametrize("terminal", [{"type": "response.failed"}, {"type": "response.incomplete"}, None])
+async def test_streamed_tool_calls_are_not_returned_before_success(terminal):
+    call = {"type": "function_call", "name": "test", "arguments": "{}", "call_id": "call1"}
+    events = [{"type": "response.output_item.done", "output_index": 0, "item": call}]
+    if terminal:
+        events.append(terminal)
+    with pytest.raises(api.ModelError):
+        await api.response(Session(events), "secret", "model", [], [])
+
+
+async def test_gaps_in_completed_output_are_rejected():
+    events = [
+        {"type": "response.output_item.done", "output_index": 1, "item": {"type": "message"}},
+        {"type": "response.completed", "response": {"status": "completed", "output": []}},
+    ]
+    with pytest.raises(api.ModelError, match=r"\[missing_output_item\]"):
+        await api.response(Session(events), "secret", "model", [], [])
