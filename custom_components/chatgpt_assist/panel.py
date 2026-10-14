@@ -126,11 +126,12 @@ class SidebarChat:
         record = self.records.get(key)
         if record and record.get("administrative") and not user.is_admin:
             raise PanelError(
-                "This history contains administrator configuration data and is unavailable to this account."
+                "This history contains administrator-only data and is unavailable to this account."
             )
         return key, entry, agent_id
 
     async def agents(self, user_id):
+        user = await self.hass.auth.async_get_user(user_id)
         result = []
         for entry_id, entry in list(self.entries.items()):
             try:
@@ -144,6 +145,10 @@ class SidebarChat:
                     "model": entry.options.get("model", ""),
                     "web_search": entry.options.get("web_search", False),
                     "administration": entry.options.get("administration", False),
+                    "logs_access": bool(user and user.is_admin and entry.options.get("logs_access", True)),
+                    "direct_automation_updates": bool(
+                        entry.options.get("administration") and entry.options.get("automation_apply", True)
+                    ),
                 }
             )
 
@@ -218,7 +223,12 @@ class SidebarChat:
             record = self.record(key, user_id, entry_id)
             if any(item.get("request_id") == request_id for item in record["messages"]):
                 return {**self.public(key), "busy": False}
-            record["administrative"] |= bool(entry.options.get("administration"))
+            from .logs import LogsAccess
+
+            record["administrative"] |= bool(entry.options.get("administration")) or (
+                entry.options.get("logs_access", True)
+                and await LogsAccess(self.hass, entry).is_admin(user_id)
+            )
             record["messages"].append(
                 {"role": "user", "content": text.strip(), "time": time.time(), "request_id": request_id}
             )
@@ -361,7 +371,7 @@ async def async_setup_panel(hass: HomeAssistant, entry):
                 webcomponent_name="chatgpt-assist-panel",
                 sidebar_title="ChatGPT Assist",
                 sidebar_icon="mdi:chat-outline",
-                module_url=ASSET_URL + "?v=0.5.2",
+                module_url=ASSET_URL + "?v=0.6.0",
                 require_admin=False,
             )
 

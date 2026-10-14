@@ -24,7 +24,7 @@ An error after an earlier device action does not undo that action. Check device 
 
 Queries are executed by OpenAI’s hosted tool, outside HA. Your conversation and any enabled home context are already sent to OpenAI for inference, and the model may use that context to formulate search queries. Guidance asks for generic public terms and excludes private device/configuration details, but this is prompt guidance rather than an enforceable privacy filter. Avoid sensitive context in search-enabled conversations.
 
-Search results do not authorize HA actions. Exposed-device rules still apply; configuration administration still requires an authenticated administrator and separate human review. Searches do not grant access to additional entities, files or settings.
+Search results do not authorize HA actions. Exposed-device rules still apply; configuration administration requires an authenticated administrator and selected grants; dashboards and manual-mode automations require separate human review. Direct automation mode can apply requested changes from chat. Searches do not grant access to additional entities, files or settings.
 
 Each turn has a 180-second timeout and an eight-call completed-output validation budget shared by hosted searches and HA tools. Hosted searches occur on OpenAI’s side before the integration receives the completed output, so this budget cannot prevent additional provider-side searches or their usage. No unsupported `max_tool_calls` parameter is sent on the ChatGPT plan route.
 

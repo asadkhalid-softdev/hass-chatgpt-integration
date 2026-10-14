@@ -32,6 +32,7 @@ from .history import choices as history_choices
 SETTINGS_SECTIONS = {
     "automations": {
         "automation_ids",
+        "automation_apply",
         "select_all_automations",
         "select_none_automations",
         "new_automation_ids",
@@ -311,6 +312,10 @@ class ChatGPTOptionsFlow(OptionsFlow):
                                 "administration",
                                 default=self.config_entry.options.get("administration", False),
                             ): BooleanSelector(),
+                            vol.Required(
+                                "automation_apply",
+                                default=self.config_entry.options.get("automation_apply", True),
+                            ): BooleanSelector(),
                             vol.Optional("select_all_automations", default=False): BooleanSelector(),
                             vol.Optional("select_none_automations", default=False): BooleanSelector(),
                             vol.Required(
@@ -332,6 +337,9 @@ class ChatGPTOptionsFlow(OptionsFlow):
                                 )
                             ),
                             vol.Optional("new_automation_ids", default=""): TextSelector(),
+                            vol.Required(
+                                "logs_access", default=self.config_entry.options.get("logs_access", True)
+                            ): BooleanSelector(),
                             vol.Required(
                                 "history_access",
                                 default=self.config_entry.options.get("history_access", False),

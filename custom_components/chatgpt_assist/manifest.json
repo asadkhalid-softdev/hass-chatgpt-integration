@@ -1,7 +1,7 @@
 {
   "domain": "chatgpt_assist",
   "name": "ChatGPT Assist",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "config_flow": true,
   "dependencies": [
     "conversation",
@@ -14,6 +14,10 @@
   "codeowners": [],
   "documentation": "https://developers.openai.com/siwc/token-sharing-open-source",
   "after_dependencies": [
-    "recorder"
+    "recorder",
+    "system_log",
+    "logbook",
+    "trace",
+    "hassio"
   ]
 }

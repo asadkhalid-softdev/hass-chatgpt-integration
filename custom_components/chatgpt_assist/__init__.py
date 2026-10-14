@@ -16,6 +16,7 @@ from homeassistant.helpers.storage import Store
 from .administration import Administration
 from .auth import AuthError, ConnectionError, request_json, token_record
 from .const import API_URL, DOMAIN, TOKEN_URL
+from .logs import setup_logs, unload_logs
 from .panel import PANEL_KEY, PanelError, async_setup_panel, async_unload_panel
 
 PLATFORMS = [Platform.CONVERSATION]
@@ -92,9 +93,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ChatGPTConfigEntry) -> b
     except ConnectionError as err:
         raise ConfigEntryNotReady(str(err)) from None
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    setup_logs(hass, entry)
     try:
         await async_setup_panel(hass, entry)
     except PanelError as err:
+        unload_logs(hass, entry.entry_id)
         await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
         raise ConfigEntryNotReady(str(err)) from None
     entry.async_on_unload(entry.add_update_listener(_updated))
@@ -111,6 +114,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ChatGPTConfigEntry) -> 
     """Unload entities; session is owned by HA."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
+        unload_logs(hass, entry.entry_id)
         async_unload_panel(hass, entry.entry_id)
     return unloaded
 

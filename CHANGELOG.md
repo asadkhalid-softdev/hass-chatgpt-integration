@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+- Remove the global duplicate-ID editing blocker. Inspect duplicate definitions with entry indexes and edit one entry in place; preserve siblings and block stale indexed snapshots. Support unused ID repairs and valid blueprint-input updates.
+- Enable direct automation apply/restore from chat for authenticated administrators within existing selected grants, with validation, sealed proposals, backups and conflict checks. Dashboard changes retain mandatory review; direct automation mode can be disabled.
+- Add native administrator log discovery/read tools enabled by default: Core condensed/live/file logs, activity, traces, Supervisor, discovered apps, plugins and host journals/boot offsets where supported.
+- Add bounded paging/search, native read-only adapters, best-effort credential redaction and old-context/demotion checks. Show direct-update/log capability indicators and document the changed defaults and installation-specific limits.
+
 ## 0.5.2
 
 - Render GitHub Flavored Markdown in sidebar replies: proper tables with aligned headers/cells, headings, nested lists, read-only tasks, quotes, emphasis/strikethrough, rules and labeled code blocks.

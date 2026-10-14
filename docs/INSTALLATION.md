@@ -149,3 +149,7 @@ Version 0.4.0 automatically adds **ChatGPT Assist** to the sidebar when an accou
 ### Sensor history
 
 Version 0.5.0 adds a separate **Allow read-only sensor history** switch and **Allowed sensors for history** checklist in **Configure → Model and permissions**. Enable it and choose sensors before asking about past readings. See the [history guide](HISTORY.md).
+
+### Native logs and direct automation updates (0.6.0)
+
+After updating and restarting, administrator log tools are enabled by default. Configuration administration remains separately permissioned; when enabled, direct automation apply/restore starts enabled for selected automation IDs. Open the Automations section to disable direct changes if you prefer manual review. Dashboard changes always require review. See [native logs](LOGS.md) and [automation administration](ADMINISTRATION.md).

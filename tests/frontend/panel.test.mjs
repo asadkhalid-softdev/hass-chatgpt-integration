@@ -229,3 +229,17 @@ test("bundled Markdown parser matches the pinned dependency and includes its lic
   assert.equal(await readFile(new URL("../../custom_components/chatgpt_assist/frontend/vendor/marked.js", import.meta.url), "utf8"), source);
   assert.equal(await readFile(new URL("../../custom_components/chatgpt_assist/frontend/vendor/marked.LICENSE", import.meta.url), "utf8"), await readFile(new URL("../../node_modules/marked/LICENSE", import.meta.url), "utf8"));
 });
+
+test("header shows direct automation and administrator log capabilities", async () => {
+  const page = await fixture();
+  try {
+    await page.evaluate(() => {
+      const element = document.querySelector("chatgpt-assist-panel");
+      element._agents[0].direct_automation_updates = true;
+      element._agents[0].logs_access = true;
+      element._updateControls();
+    });
+    assert.match(await page.locator("chatgpt-assist-panel .subtitle").textContent(), /Direct automation updates/);
+    assert.match(await page.locator("chatgpt-assist-panel .subtitle").textContent(), /Admin logs enabled/);
+  } finally { await page.close(); }
+});

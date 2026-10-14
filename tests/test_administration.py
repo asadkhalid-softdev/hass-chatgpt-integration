@@ -91,7 +91,7 @@ async def test_automation_validation_write_reload_restore_and_create(environment
     assert await manager.read("automation", "morning") == before
     await manager.apply_from_options(proposal, reviewer_id="admin")
     assert (await manager.read("automation", "morning"))["alias"] == "Improved morning"
-    assert reloads == [{"id": "morning"}]
+    assert reloads == [{}]
     await manager.apply_from_options(proposal, reviewer_id="admin", rollback=True)
     assert await manager.read("automation", "morning") == before
     new = (await manager.propose("admin", "automation", "new", json.dumps({**before, "id": "new"})))[
@@ -147,6 +147,7 @@ async def test_approval_fails_closed_without_writing(environment, change):
 
 async def test_real_tool_schemas_no_model_approval_and_context(environment):
     hass, entry, manager, _, _ = environment
+    entry.options.update({"automation_apply": False, "logs_access": False})
     context = llm.LLMContext(
         platform="chatgpt_assist",
         context=Context(user_id="admin"),
@@ -206,7 +207,7 @@ async def test_invalid_config_scope_blueprints_yaml_and_secrets_never_write(envi
     hass, _, manager, before, _ = environment
     for kind, target, config in [
         ("automation", "not-granted", before),
-        ("automation", "morning", {**before, "id": "other"}),
+        ("automation", "morning", {**before, "id": "../../other"}),
         ("automation", "morning", {"id": "morning", "triggers": "invalid"}),
         ("automation", "morning", {**before, "use_blueprint": {"path": "test"}}),
         ("dashboard", "test-dashboard", {"views": "invalid"}),
@@ -233,12 +234,12 @@ async def test_backup_persisted_before_write_failure_and_recovery(environment, m
     proposal = await draft_dashboard(manager)
     original = manager._write
 
-    async def fail_after_write(record, config, expected):
+    async def fail_after_write(record, config, expected, *, rollback=False):
         recovered = Administration(hass, entry)
         await recovered.load()
         assert recovered.records[proposal]["before"]["views"][0]["title"] == "Original"
         assert recovered.records[proposal]["status"] == "applying"
-        await original(record, config, expected)
+        await original(record, config, expected, rollback=rollback)
         raise OSError("never expose internal secret")
 
     monkeypatch.setattr(manager, "_write", fail_after_write)
@@ -876,6 +877,7 @@ async def test_native_permission_sections_start_closed_and_save_existing_flat_gr
     assert all(not field["expanded"] for field in sections.values())
     assert {field["name"] for field in sections["automations"]["schema"]} == {
         "automation_ids",
+        "automation_apply",
         "select_all_automations",
         "select_none_automations",
         "new_automation_ids",
@@ -944,3 +946,224 @@ async def test_bulk_review_and_validation_open_only_affected_native_sections(env
     }
     assert sections["automations"].options["collapsed"] is False
     assert entry.options["automation_ids"] == "morning,new"
+
+
+async def test_unrelated_duplicate_ids_do_not_block_unique_edit(environment, tmp_path):
+    _, _, manager, before, _ = environment
+    (tmp_path / "automations.yaml").write_text(
+        yaml.safe_dump(
+            [
+                before,
+                {**before, "id": "duplicate", "alias": "Unselected first"},
+                {**before, "id": "duplicate", "alias": "Unselected second"},
+            ]
+        )
+    )
+    proposal = await manager.propose(
+        "admin", "automation", "morning", json.dumps({**before, "alias": "Updated"})
+    )
+    await manager.apply_from_options(proposal["proposal_id"], reviewer_id="admin")
+    values = yaml.safe_load((tmp_path / "automations.yaml").read_text())
+    assert values[0]["alias"] == "Updated"
+    assert [value["alias"] for value in values[1:]] == ["Unselected first", "Unselected second"]
+    await manager.apply_from_options(proposal["proposal_id"], reviewer_id="admin", rollback=True)
+    assert yaml.safe_load((tmp_path / "automations.yaml").read_text())[0] == before
+
+
+async def test_duplicate_entries_are_inspectable_and_surgical_updates_restore(environment, tmp_path):
+    _, _, manager, before, _ = environment
+    second = {**before, "alias": "Second humidity rule"}
+    (tmp_path / "automations.yaml").write_text(yaml.safe_dump([before, second]))
+    entries = await manager.automation_entries()
+    assert [item["entry_index"] for item in entries] == [0, 1]
+    assert all(item["duplicate_id"] for item in entries)
+    inspected = await manager.read("automation", "morning")
+    assert inspected["duplicate_id"] == "morning" and len(inspected["entries"]) == 2
+    assert await manager.read("automation", "morning", 1) == second
+    with pytest.raises(AdministrationError, match="entry_index"):
+        await manager.propose("admin", "automation", "morning", json.dumps({**second, "alias": "Changed"}))
+    proposal = await manager.propose(
+        "admin", "automation", "morning", json.dumps({**second, "alias": "Changed"}), entry_index=1
+    )
+    await manager.apply_from_options(proposal["proposal_id"], reviewer_id="admin")
+    values = yaml.safe_load((tmp_path / "automations.yaml").read_text())
+    assert values[0] == before and values[1]["alias"] == "Changed"
+    await manager.apply_from_options(proposal["proposal_id"], reviewer_id="admin", rollback=True)
+    assert yaml.safe_load((tmp_path / "automations.yaml").read_text()) == [before, second]
+
+
+async def test_duplicate_id_can_be_repaired_and_undone_without_touching_other_entry(environment, tmp_path):
+    _, _, manager, before, _ = environment
+    second = {**before, "alias": "Second"}
+    (tmp_path / "automations.yaml").write_text(yaml.safe_dump([before, second]))
+    proposal = await manager.propose(
+        "admin", "automation", "morning", json.dumps({**second, "id": "unique_second"}), entry_index=1
+    )
+    await manager.apply_from_options(proposal["proposal_id"], reviewer_id="admin")
+    values = yaml.safe_load((tmp_path / "automations.yaml").read_text())
+    assert values[0] == before and values[1]["id"] == "unique_second"
+    await manager.apply_from_options(proposal["proposal_id"], reviewer_id="admin", rollback=True)
+    assert yaml.safe_load((tmp_path / "automations.yaml").read_text()) == [before, second]
+
+
+async def test_duplicate_index_reordering_blocks_stale_draft(environment, tmp_path):
+    _, _, manager, before, _ = environment
+    second = {**before, "alias": "Second"}
+    (tmp_path / "automations.yaml").write_text(yaml.safe_dump([before, second]))
+    proposal = await manager.propose(
+        "admin", "automation", "morning", json.dumps({**second, "alias": "Changed"}), entry_index=1
+    )
+    (tmp_path / "automations.yaml").write_text(yaml.safe_dump([second, before]))
+    with pytest.raises(AdministrationError, match="changed"):
+        await manager.apply_from_options(proposal["proposal_id"], reviewer_id="admin")
+    assert yaml.safe_load((tmp_path / "automations.yaml").read_text()) == [second, before]
+
+
+async def test_direct_apply_and_restore_tools_are_admin_scoped_and_dashboard_review_stays(environment):
+    hass, entry, manager, before, _ = environment
+    entry.options["logs_access"] = False
+    context = llm.LLMContext(
+        platform="chatgpt_assist",
+        context=Context(user_id="admin"),
+        language="en",
+        assistant="conversation.test",
+        device_id=None,
+    )
+    api = await ConfigurationAPI(hass, entry).async_get_api_instance(context)
+    assert {"configuration_apply", "configuration_restore"} <= {tool.name for tool in api.tools}
+    proposal = await manager.propose(
+        "admin", "automation", "morning", json.dumps({**before, "alias": "Direct update"})
+    )
+    apply = ConfigurationTool(manager, "apply")
+    arguments = llm.ToolInput(tool_name=apply.name, tool_args={"proposal_id": proposal["proposal_id"]})
+    result = await apply.async_call(hass, arguments, context)
+    result = result.data if hasattr(result, "data") else result
+    assert result["status"] == "applied" and result["backup_available"] is True
+    assert (await manager.read("automation", "morning"))["alias"] == "Direct update"
+    restore = ConfigurationTool(manager, "restore")
+    result = await restore.async_call(hass, arguments, context)
+    result = result.data if hasattr(result, "data") else result
+    assert result["status"] == "rolled_back" and await manager.read("automation", "morning") == before
+    dashboard = await draft_dashboard(manager)
+    denied = await apply.async_call(
+        hass, llm.ToolInput(tool_name=apply.name, tool_args={"proposal_id": dashboard}), context
+    )
+    denied = denied.data if hasattr(denied, "data") else denied
+    assert "error" in denied
+    entry.options["automation_apply"] = False
+    api = await ConfigurationAPI(hass, entry).async_get_api_instance(context)
+    assert "configuration_apply" not in {tool.name for tool in api.tools}
+
+
+async def test_real_chat_pipeline_reads_duplicate_proposes_and_applies_requested_change(
+    environment, tmp_path, monkeypatch
+):
+    from homeassistant.components import conversation
+
+    from custom_components.chatgpt_assist import conversation as agent
+    from custom_components.chatgpt_assist.const import NAMESPACE
+
+    hass, entry, manager, before, _ = environment
+    entry.options["logs_access"] = False
+    entry.runtime_data.session = None
+    entry.runtime_data.access_token = AsyncMock(return_value="fake")
+    second = {**before, "alias": "Second rule"}
+    (tmp_path / "automations.yaml").write_text(yaml.safe_dump([before, second]))
+    entity = agent.ChatGPTConversation(entry)
+    entity.hass, entity.entity_id = hass, "conversation.test"
+    user = conversation.ConversationInput(
+        text="Update the second rule",
+        context=Context(user_id="admin"),
+        conversation_id="test",
+        language="en",
+        agent_id=entity.entity_id,
+        device_id=None,
+        satellite_id=None,
+    )
+    log = conversation.ChatLog(hass, "test")
+    log.async_add_user_content(conversation.UserContent(content=user.text))
+
+    async def provide(self, context, selected, prompt, extra):
+        self.llm_api = await selected.async_get_api_instance(context)
+        self.content[0] = conversation.SystemContent(content=prompt + self.llm_api.api_prompt)
+
+    monkeypatch.setattr(conversation.ChatLog, "async_provide_llm_data", provide)
+    count = 0
+
+    async def response(*args):
+        nonlocal count
+        count += 1
+        json.dumps(args[4])
+        if count == 1:
+            name, values = "configuration_read", {"kind": "automation", "target": "morning"}
+        elif count == 2:
+            name, values = (
+                "configuration_propose",
+                {
+                    "kind": "automation",
+                    "target": "morning",
+                    "entry_index": 1,
+                    "config_json": json.dumps({**second, "alias": "Updated second rule"}),
+                },
+            )
+        elif count == 3:
+            name, values = "configuration_apply", {"proposal_id": next(iter(manager.records))}
+        else:
+            return {
+                "output": [
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "output_text", "text": "Applied the requested update."}],
+                    }
+                ]
+            }
+        return {
+            "output": [
+                {
+                    "type": "function_call",
+                    "namespace": NAMESPACE,
+                    "name": name,
+                    "call_id": f"call{count}",
+                    "arguments": json.dumps(values),
+                }
+            ]
+        }
+
+    monkeypatch.setattr(agent, "response", response)
+    result = await entity._async_handle_message(user, log)
+    assert "Applied" in result.response.speech["plain"]["speech"]
+    values = yaml.safe_load((tmp_path / "automations.yaml").read_text())
+    assert values[0] == before and values[1]["alias"] == "Updated second rule"
+    assert next(iter(manager.records.values()))["status"] == "applied"
+
+
+async def test_native_config_entry_rename_retains_restore_authority_and_grants_new_id(environment):
+    from homeassistant.config_entries import ConfigEntries, ConfigEntry
+
+    from custom_components.chatgpt_assist.const import DOMAIN
+
+    hass, old_entry, _, before, _ = environment
+    hass.config_entries = ConfigEntries(hass, {})
+    entry = ConfigEntry(
+        version=1,
+        minor_version=1,
+        domain=DOMAIN,
+        title="Test",
+        data={},
+        options=dict(old_entry.options),
+        source="user",
+        unique_id="test",
+        discovery_keys={},
+        subentries_data=[],
+    )
+    hass.config_entries._entries[entry.entry_id] = entry
+    manager = Administration(hass, entry)
+    proposal = await manager.propose(
+        "admin", "automation", "morning", json.dumps({**before, "id": "renamed_morning"})
+    )
+    await manager.apply_from_options(proposal["proposal_id"], reviewer_id="admin")
+    assert {"morning", "renamed_morning"} <= set(entry.options["automation_ids"])
+    assert (await manager.read("automation", "renamed_morning"))["alias"] == "Morning"
+    await manager.apply_from_options(proposal["proposal_id"], reviewer_id="admin", rollback=True)
+    assert await manager.read("automation", "morning") == before

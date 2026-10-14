@@ -33,23 +33,28 @@
     "step": {
       "settings": {
         "title": "ChatGPT Assist options",
-        "description": "Choose a model and enable the capabilities you need. Expand Automations, Dashboards or Sensor history to review their permission checklists. Nothing new is granted automatically. For bulk selection, check one Select all/none option and Submit to refresh the list; review it, then Submit again to save. Configuration changes always require administrator review.\n\n{discovery_notice}",
+        "description": "Choose a model and capabilities. Expand the permission checklists to select targets. Direct automation updates and administrator log access are enabled by default; automation writes still require configuration access and a checked target. Dashboard changes require review. Select all/none refreshes the checklist on Submit; submit again to save.\n\n{discovery_notice}",
         "data": {
           "model": "ChatGPT model",
           "control": "Allow reading and controlling exposed entities",
-          "administration": "Enable configuration inspection and drafts (administrators only)",
+          "administration": "Enable configuration administration (administrators only)",
           "web_search": "Allow internet search",
-          "history_access": "Allow read-only sensor history"
+          "history_access": "Allow read-only sensor history",
+          "logs_access": "Allow administrator access to all available native logs"
         },
         "sections": {
           "automations": {
             "name": "Automations",
-            "description": "Choose the automations whose definitions may be inspected and drafted. Configuration inspection requires an authenticated administrator. Select none also clears reserved new IDs; unsupported sources remain read-only.",
+            "description": "Select automation IDs. Duplicate IDs can be inspected and edited as individual entries. Existing blueprint inputs may be edited. Direct changes require an authenticated administrator; Select none clears reserved IDs too.",
             "data": {
               "select_all_automations": "Select all listed automations",
               "select_none_automations": "Select none (automations)",
               "automation_ids": "Allowed automations",
-              "new_automation_ids": "Reserve IDs for new automations (optional, comma separated)"
+              "new_automation_ids": "Reserve IDs for new automations (optional, comma separated)",
+              "automation_apply": "Allow direct automation updates and restoration from chat"
+            },
+            "data_description": {
+              "automation_apply": "Enabled by default. Requested updates can save validated changes and reload automations without a separate approval dialog. Backups and conflict checks remain. Disable to require Configure review."
             }
           },
           "dashboards": {
@@ -73,9 +78,10 @@
         },
         "data_description": {
           "control": "Uses Home Assistant Assist permissions and exposed entities. Device actions can execute without an extra confirmation.",
-          "administration": "Allows inspection and drafts for checked automations/dashboards; each edit needs administrator review before applying.",
+          "administration": "Allows selected configuration access. Automation changes may be applied directly from chat; dashboards always require review.",
           "history_access": "Allows read-only queries for checked history sensors, separately from device control. Requires an authenticated user.",
-          "web_search": "Sends search queries to OpenAI\u2019s hosted tool. Availability depends on the selected model and account."
+          "web_search": "Sends search queries to OpenAI\u2019s hosted tool. Availability depends on the selected model and account.",
+          "logs_access": "Includes Core errors/live/file logs, activity, automation/script traces and native Supervisor, app/plugin and host logs where available. Queried logs are sent to ChatGPT with best-effort credential redaction."
         }
       },
       "init": {

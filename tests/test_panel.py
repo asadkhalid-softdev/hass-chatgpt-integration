@@ -182,7 +182,7 @@ async def test_admin_history_stays_protected_after_role_and_option_changes(chat)
     await send(backend, user="admin")
     entry.options["administration"] = False
     users["admin"].is_admin = False
-    with pytest.raises(panel.PanelError, match="administrator configuration"):
+    with pytest.raises(panel.PanelError, match="administrator-only"):
         await backend.history("admin", "account")
 
 
@@ -309,7 +309,7 @@ async def test_panel_registration_once_and_last_unload_removes_sidebar(chat):
     assert (
         hass.data[frontend.DATA_PANELS][panel.PANEL_PATH]
         .config["_panel_custom"]["module_url"]
-        .endswith("?v=0.5.2")
+        .endswith("?v=0.6.0")
     )
     panel.async_unload_panel(hass, entry.entry_id)
     assert panel.PANEL_PATH not in hass.data[frontend.DATA_PANELS]
@@ -370,3 +370,15 @@ async def test_concurrent_panel_setup_registers_asset_and_route_once(chat):
     hass.data[websocket_api.DOMAIN] = {}
     await asyncio.gather(panel.async_setup_panel(hass, entry), panel.async_setup_panel(hass, entry))
     hass.http.async_register_static_paths.assert_awaited_once()
+
+
+async def test_log_enabled_admin_history_stays_private_without_configuration_access(chat):
+    _, backend, entry, users, _ = chat
+    assert not entry.options.get("administration")
+    agents = await backend.agents("admin")
+    assert agents[0]["logs_access"] is True
+    assert (await backend.agents("one"))[0]["logs_access"] is False
+    await send(backend, user="admin")
+    users["admin"].is_admin = False
+    with pytest.raises(panel.PanelError, match="administrator-only"):
+        await backend.history("admin", entry.entry_id)

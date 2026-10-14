@@ -193,11 +193,27 @@ class ChatGPTConversation(conversation.ConversationEntity):
                             await access.authorize(user_input.context.user_id, data.get("entity_ids", []))
             except HistoryError as err:
                 return self._error(user_input, chat_log, str(err) + " Clear message history before retrying.")
+        from .logs import LogsAccess, LogsError
+
+        logs_access = LogsAccess(self.hass, self.entry)
+        logs_available = self.entry.options.get("logs_access", True) and await logs_access.is_admin(
+            user_input.context.user_id
+        )
+        if any(
+            isinstance(item, conversation.ToolResultContent) and item.tool_name.startswith("logs_")
+            for item in chat_log.content
+        ):
+            try:
+                await logs_access.authorize(user_input.context.user_id)
+            except LogsError as err:
+                return self._error(user_input, chat_log, str(err) + " Clear message history before retrying.")
         await chat_log.async_provide_llm_data(
             user_input.as_llm_context(DOMAIN),
             (
                 ConfigurationAPI(self.hass, self.entry)
-                if self.entry.options.get("administration") or self.entry.options.get("history_access")
+                if self.entry.options.get("administration")
+                or self.entry.options.get("history_access")
+                or logs_available
                 else [llm.LLM_API_ASSIST]
                 if self.entry.options.get("control")
                 else None
@@ -217,7 +233,7 @@ class ChatGPTConversation(conversation.ConversationEntity):
                 {
                     "type": "namespace",
                     "name": NAMESPACE,
-                    "description": "Home Assistant device tools, read-only sensor history and administrator configuration drafts.",
+                    "description": "Home Assistant device tools, sensor history, administrator logs and configuration operations.",
                     "tools": [
                         {
                             "type": "function",

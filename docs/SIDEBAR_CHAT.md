@@ -9,7 +9,7 @@ Version 0.4.0 adds **ChatGPT Assist** to the Home Assistant sidebar. The fronten
 3. Click **ChatGPT Assist** in the sidebar. Its direct path is `/chatgpt-assist`.
 4. If you have multiple available account registrations, select the assistant above the messages. The most recently used assistant is offered first after a page reload.
 
-The panel uses your existing ChatGPT conversation agent, model and permissions. Assist and voice pipelines continue to work. Selecting an assistant switches to that account’s own history; it does not send a message. If no assistant is available, use **Refresh assistants** or check the integration settings. Assistants with configuration administration enabled are available only to authenticated administrators.
+The panel uses your existing ChatGPT conversation agent, model and permissions. The header indicates administrator log access and direct automation updates when available. Direct automation mode can apply requested changes without a separate dialog; dashboard changes still require Configure review. Assist and voice pipelines continue to work. Selecting an assistant switches to that account’s own history; it does not send a message. If no assistant is available, use **Refresh assistants** or check the integration settings. Assistants with configuration administration enabled are available only to authenticated administrators.
 
 ## Send messages
 
@@ -21,7 +21,7 @@ The panel uses your existing ChatGPT conversation agent, model and permissions. 
 
 Version 0.5.2 renders GitHub Flavored Markdown: real tables with headers and aligned columns, headings, nested numbered/bulleted lists, read-only task lists, block quotes, horizontal rules, bold/italic/strikethrough text, inline code, fenced code blocks with language labels, and source links. Wide tables scroll inside the message on mobile and can be focused for keyboard scrolling. This is a local Markdown renderer, not ChatGPT’s proprietary frontend. Mathematical notation, Mermaid diagrams and syntax highlighting are not included. Source links open in a separate tab; message HTML and images are treated as text rather than executed or fetched. Use **Copy** to copy an assistant response.
 
-Internet search is controlled by **Allow internet search** in Configure. Configuration edits still require approval through **Configure → Review changes**; the chat provides a settings/review link for administrators. Sending “approve” does not apply a proposal.
+Internet search is controlled by **Allow internet search** in Configure. Direct automation mode can apply requested updates and restore their backups from chat. Dashboard proposals and manual-mode automation proposals require **Configure → Review changes**; the chat provides a settings/review link for administrators. Log access is administrator-only and can be disabled independently.
 
 ## Message history
 

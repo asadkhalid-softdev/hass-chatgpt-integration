@@ -372,7 +372,7 @@ class ChatGPTAssistPanel extends HTMLElement {
     this._select.disabled = this._busy;
     this._input.disabled = !available;
     const agent = this._agents.find((item) => item.entry_id === this._entryId);
-    this._subtitle.textContent = !this._ready ? "Connecting…" : this._busy ? "Replying…" : agent ? [agent.model, agent.web_search ? "Internet search enabled" : null].filter(Boolean).join(" · ") : "No assistant available";
+    this._subtitle.textContent = !this._ready ? "Connecting…" : this._busy ? "Replying…" : agent ? [agent.model, agent.direct_automation_updates ? "Direct automation updates" : null, agent.logs_access ? "Admin logs enabled" : null, agent.web_search ? "Internet search enabled" : null].filter(Boolean).join(" · ") : "No assistant available";
   }
 
   _renderMessages(forceScroll = false) {
