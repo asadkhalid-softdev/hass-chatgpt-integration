@@ -35,10 +35,12 @@ question; it will also start with fresh context.
    individual household members: anyone able to speak to a paired Echo uses this chosen
    HA actor. Existing agent tools/permissions apply, including administration/log tools
    if the selected user and integration permit them.
-5. Open the skill on one physical Echo. It replies that it must be paired.
-6. Reopen Alexa settings. Select that discovered Echo and its corresponding Alexa Media
-   Player entity, then save. Repeat one Echo at a time so the opaque device IDs are
-   unambiguous. You can select an already paired device again to correct its target.
+5. Open the skill on one physical Echo. It speaks a six-digit pairing code.
+6. Reopen Alexa settings. Select the exact code spoken by that Echo and its corresponding
+   Alexa Media Player name, then save. New Echos appear first, with the most recently heard first.
+   Paired devices show their existing names. After updating from 0.7.0, open the skill
+   again on an unpaired Echo to give its old discovery a spoken code. You can select an
+   already paired device again to correct its target.
    The developer simulator is a different device; do not map it to a physical Echo unless
    you deliberately want simulator requests spoken there.
 7. Disable the bridge to revoke voice access. Changing the skill ID clears account/device

@@ -109,13 +109,13 @@
       },
       "alexa": {
         "title": "Alexa voice bridge",
-        "description": "Endpoint: your external HTTPS URL + {endpoint}. Enable the bridge, save, then open your skill on each Echo. Reopen these settings to pair the discovered Echo with its Alexa Media Player entity. Only signed requests from your configured skill and paired account/devices can generate replies. Voice requests use a fresh context and append to the selected user’s chat. Paired devices: {paired}. Saving the same device again changes its target. Disable the bridge to revoke all voice access. {failure}",
+        "description": "Endpoint: your external HTTPS URL + {endpoint}. Enable and save, then open your skill on the Echo you want to pair. It will speak a six-digit pairing code. Reopen these settings, select that same code, and choose the speaker’s Alexa Media Player name. New devices appear first, most recently heard first. Already paired devices show their names. Old discoveries without a code must open the skill again. Codes identify speakers; they do not grant access. Only signed requests from your configured skill and paired account/devices can generate replies. Voice requests use a fresh context and append to the selected user’s chat. Paired devices: {paired}. Selecting an already paired device changes its target. Disable the bridge to revoke voice access. {failure}",
         "data": {
           "enabled": "Enable Alexa endpoint",
           "skill_id": "Alexa skill ID",
           "user_id": "Run and save voice questions as this HA user",
           "limit": "Spoken character budget (200–1000; default 450)",
-          "device": "Discovered Echo to pair",
+          "device": "Echo pairing code or paired name",
           "target": "Alexa Media Player target for this Echo"
         }
       }

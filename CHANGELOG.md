@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1
+
+- Unpaired Echos speak a stable six-digit code that matches the Home Assistant pairing selector.
+- Show paired speaker names and list newly discovered speakers by last-heard time, without changing existing bindings or authorization.
+
 ## 0.7.0
 
 - Add an opt-in signed Alexa endpoint with account/device pairing, independent background generation and targeted Alexa Media Player TTS.

@@ -232,6 +232,66 @@ async def test_pairing_rejects_foreign_player_and_inactive_actor(bridge):
         await manager.configure("account", settings)
 
 
+async def test_pairing_codes_are_spoken_stable_unique_and_not_authorization(bridge, monkeypatch):
+    manager, _, _, _, _, calls, notifications, target = bridge
+    # Make the collision test deterministic without depending on a randomly generated fixture code.
+    next(iter(manager.pending.values()))["pairing_code"] = "999999"
+    numbers = iter([123456, 123456, 789012])
+    monkeypatch.setattr(alexa.secrets, "randbelow", lambda maximum: next(numbers))
+    reply = await manager.accept(envelope(device="kitchen", kind="LaunchRequest"))
+    assert "1 2 3 4 5 6" in reply["response"]["outputSpeech"]["text"]
+    assert not calls and not notifications
+    repeated = await manager.accept(envelope(device="kitchen", kind="LaunchRequest"))
+    assert repeated == reply
+    other = await manager.accept(envelope(device="bedroom", kind="LaunchRequest"))
+    assert "7 8 9 0 1 2" in other["response"]["outputSpeech"]["text"]
+    with pytest.raises(PanelError):
+        await manager.configure(
+            "account",
+            {
+                "enabled": True,
+                "skill_id": alexa.DEFAULT_SKILL,
+                "user_id": "one",
+                "limit": 450,
+            },
+            "123456",
+            target,
+        )
+    assert not calls and not notifications
+
+
+async def test_pairing_choices_show_names_latest_codes_and_preserve_legacy_bindings(bridge):
+    manager, hass, _, _, _, _, _, target = bridge
+    registry = er.async_get(hass)
+    registry.async_update_entity(target, name="Work Room Echo")
+    original_mapping = copy.deepcopy(manager.settings["account"]["devices"])
+    # Simulate pre-code storage, as exists on already installed 0.7.0 instances.
+    next(iter(manager.pending.values())).pop("pairing_code", None)
+    next(iter(manager.pending.values())).pop("last_seen", None)
+    await manager.accept(envelope(device="kitchen", kind="LaunchRequest"))
+    kitchen_key = next(key for key, value in manager.pending.items() if value["device_id"] == "kitchen")
+    manager.pending[kitchen_key]["last_seen"] = 100
+    await manager.accept(envelope(device="bedroom", kind="LaunchRequest"))
+    bedroom_key = next(key for key, value in manager.pending.items() if value["device_id"] == "bedroom")
+    manager.pending[bedroom_key]["last_seen"] = 200
+    manager.pending["foreign"] = {
+        "skill_id": alexa.DEFAULT_SKILL,
+        "account_id": "another-account",
+        "device_id": "foreign",
+    }
+    choices = manager.pairing_choices("account")
+    assert [choice["value"] for choice in choices[:2]] == [bedroom_key, kitchen_key]
+    assert "New Echo — code " in choices[0]["label"]
+    assert "last heard" in choices[0]["label"]
+    assert choices[-1]["label"] == "Work Room Echo — paired"
+    assert len(choices) == 3
+    await manager.save()
+    recovered = alexa.AlexaBridge(hass)
+    await recovered.load()
+    assert recovered.settings["account"]["devices"] == original_mapping
+    assert recovered.pairing_choices("account") == choices
+
+
 async def test_concurrent_account_setup_registers_one_view_and_keeps_both_accounts(chat):  # noqa: F811
     hass, _, entry, _, _ = chat
     hass.http = SimpleNamespace(register_view=Mock())

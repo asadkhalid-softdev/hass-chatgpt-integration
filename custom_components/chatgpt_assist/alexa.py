@@ -9,6 +9,7 @@ import html
 import json
 import logging
 import re
+import secrets
 import time
 
 import aiohttp
@@ -17,6 +18,7 @@ from homeassistant.core import Context
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
 
 from .alexa_security import (
     AlexaSecurityError,
@@ -98,6 +100,31 @@ class AlexaBridge:
     def target_valid(self, target):
         entity = er.async_get(self.hass).async_get(target)
         return bool(entity and entity.platform == "alexa_media" and target.startswith("media_player."))
+
+    def pairing_choices(self, entry_id):
+        """Identify speakers by a code they say aloud, or their already paired HA name."""
+        settings = self.settings.get(entry_id, {})
+        registry = er.async_get(self.hass)
+        choices = []
+        for key, device in self.pending.items():
+            if device["skill_id"] != settings.get("skill_id", DEFAULT_SKILL):
+                continue
+            if settings.get("account_id") and device["account_id"] != settings["account_id"]:
+                continue
+            target = settings.get("devices", {}).get(device["device_id"])
+            if target:
+                entity = registry.async_get(target)
+                label = (entity.name or entity.original_name or target) if entity else target
+                label += " — paired"
+            else:
+                code = device.get("pairing_code")
+                label = f"New Echo — code {code}" if code else "Unpaired Echo — open the skill to hear a code"
+                if last_seen := device.get("last_seen"):
+                    heard = dt_util.as_local(dt_util.utc_from_timestamp(last_seen)).strftime("%H:%M:%S")
+                    label += f" — last heard {heard}"
+            choices.append((bool(target), -device.get("last_seen", 0), key, label))
+        choices.sort()
+        return [{"value": key, "label": label} for _, _, key, label in choices]
 
     async def configure(self, entry_id, values, device=None, target=None):
         """Called only by HA's authenticated administrator options flow."""
@@ -191,9 +218,21 @@ class AlexaBridge:
                 key = hashlib.sha256(f"{skill}:{account}:{device}".encode()).hexdigest()
                 if key not in self.pending and len(self.pending) >= 32:
                     raise AlexaSecurityError("Pairing list full.")
-                self.pending[key] = {"skill_id": skill, "account_id": account, "device_id": device}
+                discovered = self.pending.setdefault(
+                    key, {"skill_id": skill, "account_id": account, "device_id": device}
+                )
+                if not discovered.get("pairing_code"):
+                    used = {item.get("pairing_code") for item in self.pending.values()}
+                    while (code := f"{secrets.randbelow(1000000):06d}") in used:
+                        pass
+                    discovered["pairing_code"] = code
+                discovered["last_seen"] = time.time()
                 await self.save()
-                return skill_response("Pair this Echo in ChatGPT Assist's Alexa settings first.")
+                spoken_code = " ".join(discovered["pairing_code"])
+                return skill_response(
+                    f"Your pairing code is {spoken_code}. "
+                    "Select this code in ChatGPT Assist's Alexa settings and choose this speaker's name."
+                )
             kind = request.get("type")
             if kind == "SessionEndedRequest":
                 return skill_response()

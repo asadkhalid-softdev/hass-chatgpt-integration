@@ -191,11 +191,7 @@ class ChatGPTOptionsFlow(OptionsFlow):
             for user in await self.hass.auth.async_get_users()
             if user.is_active and not user.system_generated
         ]
-        devices = [
-            {"value": key, "label": f"Echo …{value['device_id'][-12:]} (account …{value['account_id'][-8:]})"}
-            for key, value in bridge.pending.items()
-            if value["skill_id"] == settings.get("skill_id", DEFAULT_SKILL)
-        ]
+        devices = bridge.pairing_choices(entry_id)
         from homeassistant.helpers import entity_registry as er
 
         targets = [
