@@ -1,25 +1,135 @@
 {
   "interactionModel": {
     "languageModel": {
-      "invocationName": "home assistant",
+      "invocationName": "mister jarvis",
       "intents": [
-        {"name": "AMAZON.CancelIntent", "samples": []},
-        {"name": "AMAZON.StopIntent", "samples": []},
-        {"name": "AMAZON.HelpIntent", "samples": []},
-        {"name": "AMAZON.FallbackIntent", "samples": []},
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
         {
           "name": "QuestionIntent",
-          "slots": [{"name": "question", "type": "AMAZON.SearchQuery"}],
+          "slots": [
+            {
+              "name": "question",
+              "type": "AMAZON.SearchQuery",
+              "samples": [
+                "{question}"
+              ]
+            }
+          ],
           "samples": [
-            "tell me {question}", "answer {question}", "find out {question}",
-            "check {question}", "what is {question}", "what's {question}",
-            "how is {question}", "how much {question}", "how many {question}",
-            "why is {question}", "is {question}", "are {question}",
-            "when did {question}", "show me {question}"
+            "tell me {question}",
+            "answer {question}",
+            "find out {question}",
+            "check {question}",
+            "show me {question}",
+            "explain {question}",
+            "describe {question}",
+            "summarize {question}",
+            "what is {question}",
+            "what's {question}",
+            "what are {question}",
+            "what was {question}",
+            "what were {question}",
+            "what did {question}",
+            "what does {question}",
+            "what do {question}",
+            "what has {question}",
+            "what happened to {question}",
+            "which {question}",
+            "where is {question}",
+            "where's {question}",
+            "where are {question}",
+            "when did {question}",
+            "when was {question}",
+            "when were {question}",
+            "when is {question}",
+            "when will {question}",
+            "when does {question}",
+            "when has {question}",
+            "how is {question}",
+            "how are {question}",
+            "how was {question}",
+            "how much {question}",
+            "how many {question}",
+            "how long {question}",
+            "how often {question}",
+            "how hot {question}",
+            "how cold {question}",
+            "how humid {question}",
+            "how warm {question}",
+            "how did {question}",
+            "how do {question}",
+            "how does {question}",
+            "how can {question}",
+            "why is {question}",
+            "why are {question}",
+            "why was {question}",
+            "why did {question}",
+            "why does {question}",
+            "why has {question}",
+            "is {question}",
+            "are {question}",
+            "was {question}",
+            "were {question}",
+            "did {question}",
+            "does {question}",
+            "do {question}",
+            "has {question}",
+            "have {question}",
+            "can you tell me {question}",
+            "could you tell me {question}",
+            "please tell me {question}",
+            "please check {question}",
+            "compare {question}"
           ]
         }
       ],
       "types": []
-    }
+    },
+    "dialog": {
+      "delegationStrategy": "SKILL_RESPONSE",
+      "intents": [
+        {
+          "name": "QuestionIntent",
+          "confirmationRequired": false,
+          "slots": [
+            {
+              "name": "question",
+              "type": "AMAZON.SearchQuery",
+              "elicitationRequired": true,
+              "confirmationRequired": false,
+              "prompts": {
+                "elicitation": "Elicit.Question"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "prompts": [
+      {
+        "id": "Elicit.Question",
+        "variations": [
+          {
+            "type": "PlainText",
+            "value": "What would you like to know?"
+          }
+        ]
+      }
+    ]
   }
 }

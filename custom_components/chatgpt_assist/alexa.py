@@ -55,6 +55,24 @@ def skill_response(text=None, *, end=True):
     return {"version": "1.0", "response": response}
 
 
+def ask_question(text="What would you like to know?"):
+    """Elicit the whole utterance, rather than requiring an intent carrier phrase."""
+    result = skill_response(text, end=False)
+    result["response"]["reprompt"]["outputSpeech"]["text"] = "What's your question?"
+    result["response"]["directives"] = [
+        {
+            "type": "Dialog.ElicitSlot",
+            "slotToElicit": "question",
+            "updatedIntent": {
+                "name": "QuestionIntent",
+                "confirmationStatus": "NONE",
+                "slots": {"question": {"name": "question", "confirmationStatus": "NONE"}},
+            },
+        }
+    ]
+    return result
+
+
 def spoken_text(text, limit):
     """Send plain text only, including against model-generated SSML injection."""
     text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
@@ -237,9 +255,7 @@ class AlexaBridge:
             if kind == "SessionEndedRequest":
                 return skill_response()
             if kind == "LaunchRequest":
-                return skill_response(
-                    "Ask a question. For example, say: tell me the bedroom temperature.", end=False
-                )
+                return ask_question()
             intent = request.get("intent", {})
             name = intent.get("name")
             if kind != "IntentRequest":
@@ -247,10 +263,16 @@ class AlexaBridge:
             if name in ("AMAZON.StopIntent", "AMAZON.CancelIntent"):
                 return skill_response("Goodbye.")
             if name != "QuestionIntent":
-                return skill_response("Say: tell me, followed by your question.", end=False)
+                return ask_question(
+                    "I didn't catch your question. Please say it again."
+                    if name == "AMAZON.FallbackIntent"
+                    else "You can ask about your home, devices, or history. What would you like to know?"
+                )
             text = intent.get("slots", {}).get("question", {}).get("value", "")
-            if not isinstance(text, str) or not text.strip() or len(text) > 4000:
-                return skill_response("Please ask a shorter question.")
+            if not isinstance(text, str) or not text.strip():
+                return ask_question("What's your question?")
+            if len(text) > 4000:
+                return ask_question("Please ask a shorter question.")
             dedup = hashlib.sha256(f"{skill}:{account}:{request_id}".encode()).hexdigest()
             if dedup in self.seen:
                 return skill_response("Your question has already been received.")

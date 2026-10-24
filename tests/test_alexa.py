@@ -5,6 +5,7 @@ import base64
 import copy
 import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
@@ -70,6 +71,77 @@ async def bridge(chat):  # noqa: F811 -- pytest resolves the imported fixture
 
 async def finish(manager):
     await asyncio.gather(*(job[1] for job in list(manager.tasks.values())))
+
+
+@pytest.mark.parametrize(
+    "kind,name",
+    [
+        ("LaunchRequest", None),
+        ("IntentRequest", "AMAZON.HelpIntent"),
+        ("IntentRequest", "AMAZON.FallbackIntent"),
+        ("IntentRequest", "QuestionIntent"),
+    ],
+)
+async def test_launch_and_recovery_collect_question_without_starting_a_job(bridge, kind, name):
+    manager, _, _, _, _, calls, notifications, _ = bridge
+    request = envelope(kind=kind)
+    request["request"]["intent"] = {"name": name, "slots": {}}
+    result = (await manager.accept(request))["response"]
+    assert result["shouldEndSession"] is False
+    directive = result["directives"][0]
+    assert directive["type"] == "Dialog.ElicitSlot"
+    assert directive["slotToElicit"] == "question"
+    assert directive["updatedIntent"]["name"] == "QuestionIntent"
+    assert "value" not in directive["updatedIntent"]["slots"]["question"]
+    assert not calls and not notifications and not manager.tasks and not manager.seen
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "When was the last time work heater turned on",
+        "How long was the work heater on yesterday",
+        "Is the bedroom warmer than yesterday",
+        "Compare the bedroom and kitchen temperatures",
+    ],
+)
+async def test_elicited_natural_question_reaches_agent_without_losing_words(bridge, monkeypatch, question):
+    manager, _, backend, _, _, _, _, _ = bridge
+    send = AsyncMock(return_value="Answer.")
+    monkeypatch.setattr(backend, "send_external", send)
+    await manager.accept(envelope(kind="LaunchRequest"))
+    request = envelope()
+    request["request"]["dialogState"] = "IN_PROGRESS"
+    request["request"]["intent"]["slots"]["question"]["value"] = question
+    response = (await manager.accept(request))["response"]
+    assert response["shouldEndSession"] is True
+    assert "directives" not in response
+    await finish(manager)
+    assert send.call_args.args[2] == question
+
+
+@pytest.mark.parametrize("name", ["AMAZON.StopIntent", "AMAZON.CancelIntent"])
+async def test_stop_while_collecting_question_does_not_elicit_or_generate(bridge, name):
+    manager, _, _, _, _, calls, notifications, _ = bridge
+    await manager.accept(envelope(kind="LaunchRequest"))
+    request = envelope()
+    request["request"]["intent"] = {"name": name}
+    response = (await manager.accept(request))["response"]
+    assert response["shouldEndSession"] is True
+    assert "directives" not in response
+    assert not manager.tasks and not calls and not notifications
+
+
+def test_bundled_model_supports_elicitation_without_invalid_bare_intent_sample():
+    model = json.loads((Path(__file__).parents[1] / "docs/alexa/en-US.json").read_text())["interactionModel"]
+    question = next(i for i in model["languageModel"]["intents"] if i["name"] == "QuestionIntent")
+    assert question["slots"][0]["samples"] == ["{question}"]
+    assert "{question}" not in question["samples"]
+    assert "when was {question}" in question["samples"]
+    assert model["dialog"]["delegationStrategy"] == "SKILL_RESPONSE"
+    slot = model["dialog"]["intents"][0]["slots"][0]
+    assert slot["name"] == "question" and slot["elicitationRequired"] is True
+    assert slot["prompts"]["elicitation"] in {p["id"] for p in model["prompts"]}
 
 
 async def test_voice_has_no_history_and_does_not_mutate_chat_inference_context(bridge):

@@ -51,11 +51,15 @@ not reset the stable sidebar configuration or reload the conversation agent.
 
 ## Alexa Developer Console
 
-For skill **Alexa-AI-Hass**, invocation **home assistant**:
+For skill **Alexa-AI-Hass**, invocation **mister jarvis**:
 
 1. Use a **Custom** interaction model and a self-hosted **HTTPS** endpoint.
 2. Under **Interaction Model → JSON Editor**, import [en-US.json](alexa/en-US.json), save
-   and build. It uses `QuestionIntent` with an `AMAZON.SearchQuery` slot named `question`.
+   and build. Keep your preferred invocation name when importing. The supplied name is
+   `mister jarvis`. It uses `QuestionIntent` with an `AMAZON.SearchQuery` slot named
+   `question`, a dialog model with manual delegation, and a bare `{question}` **slot sample**.
+   Import the whole model, including `dialog` and `prompts`; these are required by the
+   integration's `Dialog.ElicitSlot` response. The bare sample is not an intent sample.
    The supplied model is English (US), matching the current skill. Other Echo locales
    require their own translated model.
 3. Under **Endpoint**, choose HTTPS and set Default Region to:
@@ -71,12 +75,34 @@ For skill **Alexa-AI-Hass**, invocation **home assistant**:
    OAuth account linking are not needed for this paired private installation.
 5. Open the skill and pair devices as above. Then try:
 
-   - “Alexa, ask home assistant what's the bedroom temperature.”
-   - “Alexa, ask home assistant to tell me the average bedroom temperature last night.”
+   - “Alexa, ask mister jarvis what's the bedroom temperature.”
+   - “Alexa, ask mister jarvis to tell me the average bedroom temperature last night.”
 
-`AMAZON.SearchQuery` captures a slot rather than exposing a raw audio/transcript stream.
-Carrier words such as “tell me” may be removed from the forwarded question. Phrase
-recognition must be verified on the actual Echo.
+### Natural questions
+
+Update the Alexa model and ChatGPT Assist to 0.7.2, then restart Home Assistant.
+After “Alexa, open mister jarvis”, the short “What would you like to know?” prompt
+explicitly elicits the entire question slot. Ask naturally, for example:
+
+- “When was the last time work heater turned on?”
+- “How long was the work heater on yesterday?”
+- “Compare the bedroom and kitchen temperatures.”
+- “Is the bedroom warmer than yesterday?”
+
+Help, fallback, and empty questions re-enter question collection. Stop and cancel
+still end the session. A valid question immediately closes the session with
+“Let me check”, followed by the asynchronous reply as before.
+
+One-shot requests (e.g. “Alexa, ask mister jarvis when was the last time the work heater
+turned on”) have broader carrier patterns, but remain dependent on Alexa intent
+recognition. Carrier words may be omitted from their question slot. The open-then-ask
+flow is preferred for capturing the complete question. This is still Alexa speech
+recognition, not a raw audio or guaranteed verbatim transcript feed; misrecognition,
+Alexa built-in commands, and session timeouts can still interrupt collection.
+
+References: [Dialog directives](https://developer.amazon.com/en-US/docs/alexa/custom-skills/dialog-interface-reference.html),
+[SearchQuery slot rules](https://developer.amazon.com/en-US/docs/alexa/custom-skills/slot-type-reference.html).
+Verify recognition on the actual Echo after updating both sides.
 
 NGINX Home Assistant SSL proxy should already forward this `/api/` path to HA. No new
 port or service route is needed. Verify public port 443, a valid full certificate chain,

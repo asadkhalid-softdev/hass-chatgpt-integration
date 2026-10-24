@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.2
+
+- Elicit the complete question after launch, help, fallback, or empty input, with short prompts and no required question prefix.
+- Expand natural one-shot question patterns, including historical heater questions; update the bundled invocation to mister jarvis.
+- Keep generation asynchronous, permissions unchanged, and replies scoped to the paired Echo.
+
 ## 0.7.1
 
 - Unpaired Echos speak a stable six-digit code that matches the Home Assistant pairing selector.
