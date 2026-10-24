@@ -26,13 +26,15 @@ from custom_components.chatgpt_assist.config_flow import ChatGPTOptionsFlow
 from custom_components.chatgpt_assist.panel import PanelError
 from tests.test_panel import chat  # noqa: F401 -- reuse a real Core chat-session fixture
 
+TEST_SKILL_ID = "amzn1.ask.skill.00000000-0000-0000-0000-000000000000"
+
 
 def envelope(device="echo-one", account="amazon-user", request="request-one", kind="IntentRequest"):
     return {
         "version": "1.0",
         "context": {
             "System": {
-                "application": {"applicationId": alexa.DEFAULT_SKILL},
+                "application": {"applicationId": TEST_SKILL_ID},
                 "user": {"userId": account},
                 "device": {"deviceId": device},
             }
@@ -60,7 +62,7 @@ async def bridge(chat):  # noqa: F811 -- pytest resolves the imported fixture
     hass.services.async_register("notify", "alexa_media", notify)
     manager = alexa.AlexaBridge(hass)
     manager.entries[entry.entry_id] = entry
-    settings = {"enabled": True, "skill_id": alexa.DEFAULT_SKILL, "user_id": "one", "limit": 450}
+    settings = {"enabled": True, "skill_id": TEST_SKILL_ID, "user_id": "one", "limit": 450}
     await manager.configure(entry.entry_id, settings)
     # Discovery cannot generate anything. An administrator must pair the exact device/account.
     await manager.accept(envelope(kind="LaunchRequest"))
@@ -296,7 +298,7 @@ async def test_delivery_failure_is_visible_and_does_not_retry(bridge, monkeypatc
 async def test_pairing_rejects_foreign_player_and_inactive_actor(bridge):
     manager, hass, _, _, users, _, _, _ = bridge
     unrelated = er.async_get(hass).async_get_or_create("media_player", "other", "unrelated")
-    settings = {"enabled": True, "skill_id": alexa.DEFAULT_SKILL, "user_id": "one", "limit": 450}
+    settings = {"enabled": True, "skill_id": TEST_SKILL_ID, "user_id": "one", "limit": 450}
     with pytest.raises(PanelError):
         await manager.configure("account", settings, next(iter(manager.pending)), unrelated.entity_id)
     users["one"].is_active = False
@@ -322,7 +324,7 @@ async def test_pairing_codes_are_spoken_stable_unique_and_not_authorization(brid
             "account",
             {
                 "enabled": True,
-                "skill_id": alexa.DEFAULT_SKILL,
+                "skill_id": TEST_SKILL_ID,
                 "user_id": "one",
                 "limit": 450,
             },
@@ -347,7 +349,7 @@ async def test_pairing_choices_show_names_latest_codes_and_preserve_legacy_bindi
     bedroom_key = next(key for key, value in manager.pending.items() if value["device_id"] == "bedroom")
     manager.pending[bedroom_key]["last_seen"] = 200
     manager.pending["foreign"] = {
-        "skill_id": alexa.DEFAULT_SKILL,
+        "skill_id": TEST_SKILL_ID,
         "account_id": "another-account",
         "device_id": "foreign",
     }
@@ -385,7 +387,7 @@ async def test_alexa_options_are_admin_only_and_do_not_change_model_options(brid
     original_options = copy.deepcopy(entry.options)
     form = await flow.async_step_alexa()
     assert form["step_id"] == "alexa"
-    values = {"enabled": True, "skill_id": alexa.DEFAULT_SKILL, "user_id": "one", "limit": 400}
+    values = {"enabled": True, "skill_id": TEST_SKILL_ID, "user_id": "one", "limit": 400}
     token = current_request.set({"hass_user": users["one"]})
     try:
         assert (await flow.async_step_alexa(values))["reason"] == "alexa_admin_required"

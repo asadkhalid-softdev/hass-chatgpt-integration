@@ -32,7 +32,7 @@ from .panel import PANEL_KEY, PanelError
 
 KEY = f"{DOMAIN}.alexa"
 URL = "/api/chatgpt_assist/alexa"
-DEFAULT_SKILL = "amzn1.ask.skill.c4b5f257-f4ca-485a-b1a9-80985850a3c2"
+DEFAULT_SKILL = ""  # Each installation must supply its own Alexa skill ID.
 DEFAULT_LIMIT = 450  # Product policy, NOT a documented Amazon API limit.
 VOICE_PROMPT = """This is a standalone voice question from an Amazon Echo, not a chat turn.
 Answer the current question without referring to earlier messages. Respond in the user's language.

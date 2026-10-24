@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.3
+
+- Use an example Home Assistant domain in the Alexa setup guide and require each new installation to enter its own skill ID. Existing saved skill IDs and Echo pairings are preserved.
+
 ## 0.7.2
 
 - Elicit the complete question after launch, help, fallback, or empty input, with short prompts and no required question prefix.

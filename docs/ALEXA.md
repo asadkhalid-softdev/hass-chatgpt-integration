@@ -30,7 +30,9 @@ question; it will also start with fresh context.
 2. Ensure Alexa Media Player is installed, authenticated, and provides the
    `notify.alexa_media` service. Test its TTS action on the intended Echo.
 3. Open **Settings → Devices & services → ChatGPT Assist → Configure → Alexa voice bridge**.
-4. Enable the bridge. Enter your skill ID, choose the HA user whose permissions and
+4. Enable the bridge. Copy your own Skill ID from the Alexa Developer Console
+   (format: `amzn1.ask.skill.YOUR-SKILL-ID`). This is an identifier, not a secret key;
+   new installations leave it blank until you enter it. Choose the HA user whose permissions and
    private sidebar transcript should be used, and save. Alexa speakers do not authenticate
    individual household members: anyone able to speak to a paired Echo uses this chosen
    HA actor. Existing agent tools/permissions apply, including administration/log tools
@@ -65,11 +67,12 @@ For skill **Alexa-AI-Hass**, invocation **mister jarvis**:
 3. Under **Endpoint**, choose HTTPS and set Default Region to:
 
    ```text
-   https://hatraveller.duckdns.org/api/chatgpt_assist/alexa
+   https://ha.example.com/api/chatgpt_assist/alexa
    ```
 
-   Select the trusted certificate-authority option for the existing Duck DNS/Let's
-   Encrypt certificate. Save. Do not enter an HA token in this URL.
+   Replace `ha.example.com` with your own public Home Assistant domain.
+   Select the trusted certificate-authority option for your publicly trusted TLS certificate
+   (for example, a Let's Encrypt certificate). Save. Do not enter an HA token in this URL.
 4. Enable **Development** under **Test**. In the Alexa app, use **Your Skills → Dev** and
    enable the skill with the same Amazon account as the Echo. Public publication and
    OAuth account linking are not needed for this paired private installation.

@@ -2,7 +2,7 @@
 
 A custom conversation integration that signs in with your **ChatGPT account** and uses eligible account models in Home Assistant Assist. Device access is opt-in and uses Home Assistant's built-in Assist API.
 
-**Status:** version **0.7.2**, tested against Home Assistant Core **2026.3.4** and **2026.10.1**, Python **3.14**. OAuth and inference follow the documented OpenAI OSS preview. Live GPT-6.1 Sol text inference and a synthetic function-call round trip have been verified. Your account eligibility and a real home installation still require your verification. Other Home Assistant versions have not been verified. This is an independent project, not an official OpenAI or Home Assistant integration.
+**Status:** version **0.7.3**, tested against Home Assistant Core **2026.3.4** and **2026.10.1**, Python **3.14**. OAuth and inference follow the documented OpenAI OSS preview. Live GPT-6.1 Sol text inference and a synthetic function-call round trip have been verified. Your account eligibility and a real home installation still require your verification. Other Home Assistant versions have not been verified. This is an independent project, not an official OpenAI or Home Assistant integration.
 
 ## What it does
 
