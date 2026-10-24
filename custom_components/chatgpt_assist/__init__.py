@@ -101,6 +101,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ChatGPTConfigEntry) -> b
         await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
         raise ConfigEntryNotReady(str(err)) from None
     entry.async_on_unload(entry.add_update_listener(_updated))
+    from .alexa import async_setup_alexa
+
+    await async_setup_alexa(hass, entry)
     return True
 
 
@@ -114,6 +117,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ChatGPTConfigEntry) -> 
     """Unload entities; session is owned by HA."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
+        from .alexa import KEY as ALEXA_KEY
+
+        if bridge := hass.data.get(ALEXA_KEY):
+            await bridge.unload(entry.entry_id)
         unload_logs(hass, entry.entry_id)
         async_unload_panel(hass, entry.entry_id)
     return unloaded
@@ -121,6 +128,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ChatGPTConfigEntry) -> 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ChatGPTConfigEntry) -> None:
     """Revoke the renewable grant when an account is removed."""
+    from .alexa import KEY as ALEXA_KEY
+
+    if bridge := hass.data.get(ALEXA_KEY):
+        await bridge.remove_entry(entry.entry_id)
     if backend := hass.data.get(PANEL_KEY):
         await backend.remove_entry(entry.entry_id)
     session = async_get_clientsession(hass)

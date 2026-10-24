@@ -186,7 +186,7 @@ async def test_options_review_requires_checkbox_and_uses_server_draft(environmen
     flow.hass = hass
     monkeypatch.setattr(ChatGPTOptionsFlow, "config_entry", property(lambda self: entry))
     menu = await flow.async_step_init()
-    assert menu["menu_options"] == ["settings", "review"]
+    assert menu["menu_options"] == ["settings", "review", "alexa"]
     review = await flow.async_step_review({"proposal_id": proposal, "rollback": False})
     assert "Original" in review["description_placeholders"]["preview"]
     assert "Updated" in review["description_placeholders"]["preview"]

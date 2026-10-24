@@ -163,6 +163,7 @@ class ChatGPTAssistPanel extends HTMLElement {
       if (this._dialog.open) this._dialog.close();
       this._alert.hidden = true;
       clearTimeout(this._pollTimer);
+      clearTimeout(this._voiceTimer);
       this._renderMessages();
       this._initialize();
     }
@@ -284,6 +285,7 @@ class ChatGPTAssistPanel extends HTMLElement {
       this._select.value = this._entryId || "";
       if (this._entryId) await this._loadHistory();
       else { this._messages = []; this._ready = true; this._renderMessages(); this._updateControls(); }
+      this._watchVoiceHistory();
     } catch (error) { if (generation === this._generation) this._showError(error, "Could not load assistants."); }
   }
 
@@ -308,6 +310,29 @@ class ChatGPTAssistPanel extends HTMLElement {
   _pollHistory() {
     clearTimeout(this._pollTimer);
     this._pollTimer = setTimeout(() => { if (this.isConnected && this._busy) this._loadHistory(); }, 1500);
+  }
+
+  _watchVoiceHistory() {
+    clearTimeout(this._voiceTimer);
+    this._voiceTimer = setTimeout(async () => {
+      if (!this.isConnected) return;
+      const generation = this._generation;
+      const entryId = this._entryId;
+      if (this._ready && !this._busy && entryId) {
+        try {
+          const result = await this._rpc("history", { entry_id: entryId });
+          if (generation === this._generation && entryId === this._entryId && !this._busy) {
+            const changed = JSON.stringify(this._messages) !== JSON.stringify(result.messages);
+            this._messages = result.messages;
+            this._busy = result.busy;
+            if (changed) this._renderMessages();
+            this._updateControls();
+            if (this._busy) this._pollHistory();
+          }
+        } catch { /* Background refresh must not disturb an active composer or connection error. */ }
+      }
+      this._watchVoiceHistory();
+    }, 3000);
   }
 
   async _send() {
@@ -389,6 +414,7 @@ class ChatGPTAssistPanel extends HTMLElement {
       const article = node("article", undefined, `message ${message.role}${message.status === "error" ? " error" : ""}`);
       const meta = node("div", undefined, "meta");
       meta.append(node("span", message.role === "user" ? "You" : "ChatGPT Assist"));
+      if (message.source === "alexa") meta.append(node("span", message.delivery === "failed" ? "Alexa · delivery failed" : "Alexa"));
       if (message.time) { const time = node("time", new Date(message.time * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })); time.dateTime = new Date(message.time * 1000).toISOString(); meta.append(time); }
       article.append(meta);
       if (message.status === "pending") {
@@ -407,7 +433,7 @@ class ChatGPTAssistPanel extends HTMLElement {
     if (nearBottom || forceScroll) requestAnimationFrame(() => { this._timeline.scrollTop = this._timeline.scrollHeight; });
   }
 
-  disconnectedCallback() { clearTimeout(this._pollTimer); }
+  disconnectedCallback() { clearTimeout(this._pollTimer); clearTimeout(this._voiceTimer); }
 }
 
 if (!customElements.get("chatgpt-assist-panel")) customElements.define("chatgpt-assist-panel", ChatGPTAssistPanel);

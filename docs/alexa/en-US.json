@@ -1,0 +1,25 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "home assistant",
+      "intents": [
+        {"name": "AMAZON.CancelIntent", "samples": []},
+        {"name": "AMAZON.StopIntent", "samples": []},
+        {"name": "AMAZON.HelpIntent", "samples": []},
+        {"name": "AMAZON.FallbackIntent", "samples": []},
+        {
+          "name": "QuestionIntent",
+          "slots": [{"name": "question", "type": "AMAZON.SearchQuery"}],
+          "samples": [
+            "tell me {question}", "answer {question}", "find out {question}",
+            "check {question}", "what is {question}", "what's {question}",
+            "how is {question}", "how much {question}", "how many {question}",
+            "why is {question}", "is {question}", "are {question}",
+            "when did {question}", "show me {question}"
+          ]
+        }
+      ],
+      "types": []
+    }
+  }
+}

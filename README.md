@@ -2,9 +2,11 @@
 
 A custom conversation integration that signs in with your **ChatGPT account** and uses eligible account models in Home Assistant Assist. Device access is opt-in and uses Home Assistant's built-in Assist API.
 
-**Status:** version **0.6.0**, tested against Home Assistant Core **2026.3.4** and **2026.10.1**, Python **3.14**. OAuth and inference follow the documented OpenAI OSS preview. Live GPT-6.1 Sol text inference and a synthetic function-call round trip have been verified. Your account eligibility and a real home installation still require your verification. Other Home Assistant versions have not been verified. This is an independent project, not an official OpenAI or Home Assistant integration.
+**Status:** version **0.7.0**, tested against Home Assistant Core **2026.3.4** and **2026.10.1**, Python **3.14**. OAuth and inference follow the documented OpenAI OSS preview. Live GPT-6.1 Sol text inference and a synthetic function-call round trip have been verified. Your account eligibility and a real home installation still require your verification. Other Home Assistant versions have not been verified. This is an independent project, not an official OpenAI or Home Assistant integration.
 
 ## What it does
+
+- Optional signed Alexa HTTPS endpoint with explicitly paired Echo delivery, fresh voice context, and transcript-only sidebar history. See the [Alexa guide](docs/ALEXA.md).
 
 - Query past temperature, humidity and other selected sensors through read-only Recorder history and hourly/daily statistics. History has its own opt-in permission and works with device control disabled. See the [sensor history guide](docs/HISTORY.md).
 - Manage automation, dashboard and history-sensor grants in separate **collapsible sections**, closed initially, with named checklists and Select all/none controls. Bulk selection refreshes the checklist for review before saving; future discoveries are never automatically granted.

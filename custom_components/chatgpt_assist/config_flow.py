@@ -9,6 +9,7 @@ from uuid import uuid4
 from homeassistant.config_entries import ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import section
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.http import current_request
 from homeassistant.helpers.selector import (
@@ -162,7 +163,69 @@ class ChatGPTOptionsFlow(OptionsFlow):
     """Review is protected by HA's authenticated administrator options endpoints."""
 
     async def async_step_init(self, user_input=None):
-        return self.async_show_menu(step_id="init", menu_options=["settings", "review"])
+        return self.async_show_menu(step_id="init", menu_options=["settings", "review", "alexa"])
+
+    async def async_step_alexa(self, user_input=None):
+        """Voice bridge settings are separate from stable model/chat options."""
+        from .alexa import DEFAULT_LIMIT, DEFAULT_SKILL, KEY, URL
+
+        bridge = self.hass.data[KEY]
+        entry_id = self.config_entry.entry_id
+        settings = bridge.settings.get(entry_id, {})
+        errors = {}
+        failure = ""
+        if user_input is not None:
+            request = current_request.get()
+            actor = request.get("hass_user") if request is not None else None
+            if not actor or not actor.is_admin:
+                return self.async_abort(reason="alexa_admin_required")
+            try:
+                values = {key: user_input[key] for key in ("enabled", "skill_id", "user_id", "limit")}
+                await bridge.configure(entry_id, values, user_input.get("device"), user_input.get("target"))
+                return self.async_abort(reason="alexa_saved")
+            except (ValueError, HomeAssistantError) as err:
+                errors["base"] = "alexa_invalid"
+                failure = str(err)
+        users = [
+            {"value": user.id, "label": user.name or user.id}
+            for user in await self.hass.auth.async_get_users()
+            if user.is_active and not user.system_generated
+        ]
+        devices = [
+            {"value": key, "label": f"Echo …{value['device_id'][-12:]} (account …{value['account_id'][-8:]})"}
+            for key, value in bridge.pending.items()
+            if value["skill_id"] == settings.get("skill_id", DEFAULT_SKILL)
+        ]
+        from homeassistant.helpers import entity_registry as er
+
+        targets = [
+            {"value": item.entity_id, "label": item.name or item.original_name or item.entity_id}
+            for item in er.async_get(self.hass).entities.values()
+            if item.platform == "alexa_media" and item.domain == "media_player"
+        ]
+        fields = {
+            vol.Required("enabled", default=settings.get("enabled", False)): BooleanSelector(),
+            vol.Required("skill_id", default=settings.get("skill_id", DEFAULT_SKILL)): str,
+            vol.Required(
+                "user_id", default=settings.get("user_id", users[0]["value"] if users else "")
+            ): SelectSelector(SelectSelectorConfig(options=users)),
+            vol.Required("limit", default=settings.get("limit", DEFAULT_LIMIT)): vol.All(
+                vol.Coerce(int), vol.Range(min=200, max=1000)
+            ),
+        }
+        if devices and targets:
+            fields[vol.Optional("device")] = SelectSelector(SelectSelectorConfig(options=devices))
+            fields[vol.Optional("target")] = SelectSelector(SelectSelectorConfig(options=targets))
+        return self.async_show_form(
+            step_id="alexa",
+            data_schema=vol.Schema(fields),
+            errors=errors,
+            description_placeholders={
+                "endpoint": URL,
+                "failure": failure,
+                "paired": str(len(settings.get("devices", {}))),
+            },
+        )
 
     async def async_step_review(self, user_input=None):
         manager = self.config_entry.runtime_data.administration

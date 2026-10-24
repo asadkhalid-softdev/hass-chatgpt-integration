@@ -295,6 +295,89 @@ class SidebarChat:
         self.records = {key: value for key, value in self.records.items() if value["entry_id"] != entry_id}
         await self.save()
 
+    async def send_external(self, user_id, entry_id, text, request_id, context, language, prompt, valid):
+        """An Alexa-only turn: fresh inference, transcript-only append, no chat-context mutation."""
+        key, entry, agent_id = await self.authorize(user_id, entry_id)
+        if context.user_id != user_id:
+            raise PanelError("Invalid voice request context.")
+        lock = self.locks.setdefault(key, asyncio.Lock())
+        async with lock:
+            await self.authorize(user_id, entry_id)
+            if not valid():
+                raise PanelError("Alexa access was revoked.")
+            record = self.record(key, user_id, entry_id)
+            from .logs import LogsAccess
+
+            record["administrative"] |= bool(entry.options.get("administration")) or (
+                entry.options.get("logs_access", True)
+                and await LogsAccess(self.hass, entry).is_admin(user_id)
+            )
+            record["messages"].append(
+                {
+                    "role": "user",
+                    "content": text,
+                    "time": time.time(),
+                    "request_id": request_id,
+                    "source": "alexa",
+                }
+            )
+            reply = {
+                "role": "assistant",
+                "content": "",
+                "status": "pending",
+                "time": time.time(),
+                "request_id": request_id,
+                "source": "alexa",
+                "delivery": "pending",
+            }
+            record["messages"].append(reply)
+            await self.save()
+            try:
+                # Explicitly create a NEW Core session: never restore sidebar context or another Echo turn.
+                with async_get_chat_session(self.hass) as voice_session:
+                    result = await conversation.async_converse(
+                        self.hass,
+                        text=text,
+                        conversation_id=voice_session.conversation_id,
+                        agent_id=agent_id,
+                        context=context,
+                        language=language,
+                        extra_system_prompt=prompt,
+                    )
+                speech = result.response.speech.get("plain", {}).get("speech", "")
+                reply.update(
+                    content=speech[:16000],
+                    status="error" if result.response.response_type.value == "error" else "complete",
+                )
+            except asyncio.CancelledError:
+                reply.update(
+                    status="error", content="Voice request interrupted. Check device state before retrying."
+                )
+                raise
+            except Exception:
+                reply.update(
+                    status="error",
+                    content="The voice request failed. Some actions may have completed; check device state before retrying.",
+                )
+            finally:
+                while (
+                    len(record["messages"]) > MAX_MESSAGES
+                    or len(json.dumps(record["messages"]).encode()) > MAX_HISTORY_BYTES
+                ):
+                    del record["messages"][:2]
+                await self.save()
+            await self.authorize(user_id, entry_id)
+            return reply["content"] or "The assistant returned no spoken answer."
+
+    async def external_delivery(self, user_id, entry_id, request_id, status):
+        """Update delivery metadata without adding messages or modifying inference context."""
+        key = hashlib.sha256(f"{user_id}:{entry_id}".encode()).hexdigest()
+        async with self.locks.setdefault(key, asyncio.Lock()):
+            for item in self.records.get(key, {}).get("messages", []):
+                if item.get("request_id") == request_id and item.get("role") == "assistant":
+                    item["delivery"] = status
+            await self.save()
+
 
 @websocket_api.websocket_command(
     {
@@ -371,7 +454,7 @@ async def async_setup_panel(hass: HomeAssistant, entry):
                 webcomponent_name="chatgpt-assist-panel",
                 sidebar_title="ChatGPT Assist",
                 sidebar_icon="mdi:chat-outline",
-                module_url=ASSET_URL + "?v=0.6.0",
+                module_url=ASSET_URL + "?v=0.7.0",
                 require_admin=False,
             )
 

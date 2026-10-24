@@ -243,3 +243,21 @@ test("header shows direct automation and administrator log capabilities", async 
     assert.match(await page.locator("chatgpt-assist-panel .subtitle").textContent(), /Admin logs enabled/);
   } finally { await page.close(); }
 });
+
+test("Alexa transcript refresh preserves an unsent draft and never sends chat", async () => {
+  const page = await fixture();
+  try {
+    const input = page.getByRole("textbox", { name: "Your message" });
+    await input.fill("My unsent draft");
+    await page.evaluate(() => {
+      window.historyMessages = [...window.historyMessages,
+        {role: "user", content: "Bedroom temperature", source: "alexa", time: Date.now()/1000},
+        {role: "assistant", content: "The bedroom is 21 degrees Celsius.", source: "alexa", delivery: "submitted", status: "complete", time: Date.now()/1000}
+      ];
+    });
+    await page.getByText("The bedroom is 21 degrees Celsius.", {exact: true}).waitFor();
+    assert.equal(await input.inputValue(), "My unsent draft");
+    assert.equal(await page.getByText("Alexa", {exact: true}).count(), 2);
+    assert.equal(await page.evaluate(() => sent.filter((item) => item.operation === "send").length), 0);
+  } finally { await page.close(); }
+});

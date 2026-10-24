@@ -309,7 +309,7 @@ async def test_panel_registration_once_and_last_unload_removes_sidebar(chat):
     assert (
         hass.data[frontend.DATA_PANELS][panel.PANEL_PATH]
         .config["_panel_custom"]["module_url"]
-        .endswith("?v=0.6.0")
+        .endswith("?v=0.7.0")
     )
     panel.async_unload_panel(hass, entry.entry_id)
     assert panel.PANEL_PATH not in hass.data[frontend.DATA_PANELS]

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0
+
+- Add an opt-in signed Alexa endpoint with account/device pairing, independent background generation and targeted Alexa Media Player TTS.
+- Use separate voice instructions and fresh context while saving Alexa turns to the existing sidebar transcript. Normal chat remains silent.
+- Add voice length enforcement, replay protection, automatic sidebar refresh and setup instructions.
+
 ## 0.6.0
 
 - Remove the global duplicate-ID editing blocker. Inspect duplicate definitions with entry indexes and edit one entry in place; preserve siblings and block stale indexed snapshots. Support unused ID repairs and valid blueprint-input updates.

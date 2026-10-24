@@ -80,7 +80,7 @@
           "control": "Uses Home Assistant Assist permissions and exposed entities. Device actions can execute without an extra confirmation.",
           "administration": "Allows selected configuration access. Automation changes may be applied directly from chat; dashboards always require review.",
           "history_access": "Allows read-only queries for checked history sensors, separately from device control. Requires an authenticated user.",
-          "web_search": "Sends search queries to OpenAI\u2019s hosted tool. Availability depends on the selected model and account.",
+          "web_search": "Sends search queries to OpenAI’s hosted tool. Availability depends on the selected model and account.",
           "logs_access": "Includes Core errors/live/file logs, activity, automation/script traces and native Supervisor, app/plugin and host logs where available. Queried logs are sent to ChatGPT with best-effort credential redaction."
         }
       },
@@ -88,7 +88,8 @@
         "title": "ChatGPT Assist",
         "menu_options": {
           "settings": "Model and permissions",
-          "review": "Review changes"
+          "review": "Review changes",
+          "alexa": "Alexa voice bridge"
         }
       },
       "review": {
@@ -105,18 +106,33 @@
         "data": {
           "approve": "I have reviewed the configuration and approve this operation"
         }
+      },
+      "alexa": {
+        "title": "Alexa voice bridge",
+        "description": "Endpoint: your external HTTPS URL + {endpoint}. Enable the bridge, save, then open your skill on each Echo. Reopen these settings to pair the discovered Echo with its Alexa Media Player entity. Only signed requests from your configured skill and paired account/devices can generate replies. Voice requests use a fresh context and append to the selected user’s chat. Paired devices: {paired}. Saving the same device again changes its target. Disable the bridge to revoke all voice access. {failure}",
+        "data": {
+          "enabled": "Enable Alexa endpoint",
+          "skill_id": "Alexa skill ID",
+          "user_id": "Run and save voice questions as this HA user",
+          "limit": "Spoken character budget (200–1000; default 450)",
+          "device": "Discovered Echo to pair",
+          "target": "Alexa Media Player target for this Echo"
+        }
       }
     },
     "error": {
       "cannot_connect": "Could not refresh the account model list. The existing model is shown.",
       "administration_failed": "The operation could not be completed. See the explanation above.",
       "invalid_automation_id": "Use letters, numbers, underscores or hyphens for each new automation ID (maximum 128 characters).",
-      "conflicting_bulk_selection": "Choose either Select all or Select none for this list, then submit again."
+      "conflicting_bulk_selection": "Choose either Select all or Select none for this list, then submit again.",
+      "alexa_invalid": "Could not save Alexa settings. Check the details above."
     },
     "abort": {
       "no_proposals": "No saved proposals are available. Ask the assistant to prepare a configuration change first.",
       "configuration_applied": "Configuration applied. Automations were reloaded if applicable.",
-      "configuration_restored": "Saved configuration restored."
+      "configuration_restored": "Saved configuration restored.",
+      "alexa_saved": "Alexa settings saved.",
+      "alexa_admin_required": "Alexa settings require an authenticated administrator."
     }
   }
 }
