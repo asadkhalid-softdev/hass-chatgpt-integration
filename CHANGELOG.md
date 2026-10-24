@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.0
+
+- Add a Reasoning effort selector to Configure with the documented Responses API effort values and a backward-compatible Model default option.
+- Send the selected effort on every tool round for Assist, sidebar chat, and Alexa; report rejected reasoning settings without automatically retrying actions.
+
 ## 0.7.3
 
 - Use an example Home Assistant domain in the Alexa setup guide and require each new installation to enter its own skill ID. Existing saved skill IDs and Echo pairings are preserved.

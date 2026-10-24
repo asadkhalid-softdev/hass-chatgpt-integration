@@ -9,7 +9,7 @@ from typing import Any
 import aiohttp
 
 from .auth import AuthError, ConnectionError, request_json
-from .const import API_URL, MAX_INPUT_BYTES, MAX_RESPONSE_BYTES
+from .const import API_URL, MAX_INPUT_BYTES, MAX_RESPONSE_BYTES, REASONING_EFFORTS
 
 
 class ModelError(Exception):
@@ -79,6 +79,12 @@ def provider_error(payload: dict, stage: str, status: int | None = None) -> Exce
         root = parameter.split(".", 1)[0].split("[", 1)[0]
         if root in roots:
             tag += "; parameter=" + root
+        if (
+            root == "reasoning"
+            and recognized
+            and code in {"unsupported_parameter", "unsupported_value", "invalid_request_error"}
+        ):
+            message = "The model or account rejected this reasoning setting. Choose Model default or a supported effort in Configure."
     details = source.get("incomplete_details")
     if (
         isinstance(details, dict)
@@ -148,9 +154,17 @@ async def sse_events(content: Any) -> AsyncIterator[dict]:
 
 
 async def response(
-    session: aiohttp.ClientSession, token: str, model: str, inputs: list[dict], tools: list[dict]
+    session: aiohttp.ClientSession,
+    token: str,
+    model: str,
+    inputs: list[dict],
+    tools: list[dict],
+    *,
+    reasoning_effort: str = "default",
 ) -> dict:
     """Require a completed, bounded response before any HA tool executes."""
+    if reasoning_effort not in REASONING_EFFORTS:
+        raise ModelError("Invalid reasoning effort. Choose a supported effort in Configure.")
     payload: dict = {
         "model": model,
         "input": inputs,
@@ -160,6 +174,8 @@ async def response(
         "parallel_tool_calls": False,
         "include": ["reasoning.encrypted_content"],
     }
+    if reasoning_effort != "default":
+        payload["reasoning"] = {"effort": reasoning_effort}
     if len(json.dumps(payload).encode()) > MAX_INPUT_BYTES:
         raise ModelError("Conversation is too long. Start a new conversation.")
     try:

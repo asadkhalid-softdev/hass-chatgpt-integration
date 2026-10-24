@@ -2,6 +2,7 @@
 
 DOMAIN = "chatgpt_assist"
 NAME = "ChatGPT Assist"
+REASONING_EFFORTS = ("default", "none", "minimal", "low", "medium", "high", "xhigh", "max")
 ISSUER = "https://auth.openai.com"
 AUTHORIZE_URL = f"{ISSUER}/api/accounts/authorize"
 TOKEN_URL = f"{ISSUER}/api/accounts/oauth/token"

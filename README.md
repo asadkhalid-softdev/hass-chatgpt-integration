@@ -2,7 +2,7 @@
 
 A custom conversation integration that signs in with your **ChatGPT account** and uses eligible account models in Home Assistant Assist. Device access is opt-in and uses Home Assistant's built-in Assist API.
 
-**Status:** version **0.7.3**, tested against Home Assistant Core **2026.3.4** and **2026.10.1**, Python **3.14**. OAuth and inference follow the documented OpenAI OSS preview. Live GPT-6.1 Sol text inference and a synthetic function-call round trip have been verified. Your account eligibility and a real home installation still require your verification. Other Home Assistant versions have not been verified. This is an independent project, not an official OpenAI or Home Assistant integration.
+**Status:** version **0.8.0**, tested against Home Assistant Core **2026.3.4** and **2026.10.1**, Python **3.14**. OAuth and inference follow the documented OpenAI OSS preview. Live GPT-6.1 Sol text inference and a synthetic function-call round trip have been verified. Your account eligibility and a real home installation still require your verification. Other Home Assistant versions have not been verified. This is an independent project, not an official OpenAI or Home Assistant integration.
 
 ## What it does
 
@@ -15,6 +15,7 @@ A custom conversation integration that signs in with your **ChatGPT account** an
 - Optionally search the internet through OpenAI’s hosted web-search tool and show clickable source citations in Assist. Search starts disabled and depends on model/account eligibility. See the [internet search guide](docs/WEB_SEARCH.md).
 - Open **ChatGPT Assist** from the sidebar for a dedicated chat with private per-user history, Enter to send, Shift+Enter for new lines, a **Clear message history** menu option, and formatted Markdown tables, headings, lists, quotes and code. See the [sidebar chat guide](docs/SIDEBAR_CHAT.md).
 - Discover models available to the authorized ChatGPT account.
+- Choose **Reasoning effort** in Configure: Model default, None, Minimal, Low, Medium, High, Extra high, or Maximum. Applies to sidebar chat and Alexa; support depends on the model/account. Existing installations keep the model default until changed. See [reasoning settings](docs/REASONING.md).
 - Answer questions in Assist and retain conversation context through Home Assistant's chat log.
 - Read live home information and control exposed entities when you enable device access: for example lights, supported thermostat settings, and exposed scenes/scripts.
 - Validate OAuth state, PKCE, ID-token signatures, issuer, audience, expiry and nonce. Verify signed access-token identity again on import.

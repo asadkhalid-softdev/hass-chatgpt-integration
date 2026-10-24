@@ -1,7 +1,7 @@
 {
   "domain": "chatgpt_assist",
   "name": "ChatGPT Assist",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "config_flow": true,
   "dependencies": [
     "conversation",

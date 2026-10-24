@@ -51,7 +51,36 @@ async def test_required_preview_fields_and_complete_output():
     assert session.payload["store"] is False
     assert session.payload["stream"] is True
     assert session.kwargs["allow_redirects"] is False
+    assert "reasoning" not in session.payload
     assert not {"temperature", "max_output_tokens", "previous_response_id"} & session.payload.keys()
+
+
+@pytest.mark.parametrize("effort", ["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"])
+async def test_reasoning_effort_is_sent_as_responses_configuration(effort):
+    session = Session([{"type": "response.completed", "response": {"status": "completed", "output": []}}])
+    await api.response(session, "secret", "model", [], [], reasoning_effort=effort)
+    if effort == "default":
+        assert "reasoning" not in session.payload
+    else:
+        assert session.payload["reasoning"] == {"effort": effort}
+    assert session.payload["include"] == ["reasoning.encrypted_content"]
+
+
+async def test_invalid_reasoning_effort_never_sends_request():
+    session = Session([])
+    with pytest.raises(api.ModelError, match="Invalid reasoning effort"):
+        await api.response(session, "secret", "model", [], [], reasoning_effort="ultra")
+    assert not hasattr(session, "payload")
+
+
+def test_unsupported_reasoning_has_safe_actionable_error():
+    error = api.provider_error(
+        {"error": {"code": "unsupported_value", "param": "reasoning.effort", "message": "private"}},
+        "http_error",
+        400,
+    )
+    assert "Model default" in str(error)
+    assert "private" not in str(error)
 
 
 @pytest.mark.parametrize(

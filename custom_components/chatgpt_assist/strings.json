@@ -40,7 +40,8 @@
           "administration": "Enable configuration administration (administrators only)",
           "web_search": "Allow internet search",
           "history_access": "Allow read-only sensor history",
-          "logs_access": "Allow administrator access to all available native logs"
+          "logs_access": "Allow administrator access to all available native logs",
+          "reasoning_effort": "Reasoning effort"
         },
         "sections": {
           "automations": {
@@ -81,7 +82,8 @@
           "administration": "Allows selected configuration access. Automation changes may be applied directly from chat; dashboards always require review.",
           "history_access": "Allows read-only queries for checked history sensors, separately from device control. Requires an authenticated user.",
           "web_search": "Sends search queries to OpenAI’s hosted tool. Availability depends on the selected model and account.",
-          "logs_access": "Includes Core errors/live/file logs, activity, automation/script traces and native Supervisor, app/plugin and host logs where available. Queried logs are sent to ChatGPT with best-effort credential redaction."
+          "logs_access": "Includes Core errors/live/file logs, activity, automation/script traces and native Supervisor, app/plugin and host logs where available. Queried logs are sent to ChatGPT with best-effort credential redaction.",
+          "reasoning_effort": "Controls how much the model thinks before answering, for sidebar chat and Alexa. Lower effort usually replies faster; higher effort can take longer and use more tokens. Model default preserves the provider default. Support depends on model/account: GPT-6.1 Sol does not support None or Minimal. If rejected, choose Model default. Existing response time limits still apply."
         }
       },
       "init": {
@@ -125,7 +127,8 @@
       "administration_failed": "The operation could not be completed. See the explanation above.",
       "invalid_automation_id": "Use letters, numbers, underscores or hyphens for each new automation ID (maximum 128 characters).",
       "conflicting_bulk_selection": "Choose either Select all or Select none for this list, then submit again.",
-      "alexa_invalid": "Could not save Alexa settings. Check the details above."
+      "alexa_invalid": "Could not save Alexa settings. Check the details above.",
+      "invalid_reasoning_effort": "Select an available reasoning effort."
     },
     "abort": {
       "no_proposals": "No saved proposals are available. Ask the assistant to prepare a configuration change first.",

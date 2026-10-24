@@ -73,7 +73,8 @@ def test_history_preserves_reasoning_namespace_and_results():
     assert inputs[-1]["type"] == "function_call_output"
 
 
-async def test_real_chat_log_tools_and_multi_turn(tmp_path, monkeypatch):
+@pytest.mark.parametrize("effort", ["default", "low", "high"])
+async def test_real_chat_log_tools_and_multi_turn(tmp_path, monkeypatch, effort):
     hass = HomeAssistant(str(tmp_path))
     entry = SimpleNamespace(
         entry_id="test",
@@ -81,6 +82,8 @@ async def test_real_chat_log_tools_and_multi_turn(tmp_path, monkeypatch):
         runtime_data=SimpleNamespace(session=None, access_token=AsyncMock(return_value="secret")),
     )
     entity = agent.ChatGPTConversation(entry)
+    if effort != "default":
+        entry.options["reasoning_effort"] = effort
     entity.hass = hass
     entity.entity_id = "conversation.chatgpt"
     user = conversation.ConversationInput(
@@ -130,6 +133,11 @@ async def test_real_chat_log_tools_and_multi_turn(tmp_path, monkeypatch):
         result = await entity._async_handle_message(user, log)
         assert result.response.speech["plain"]["speech"] == "Done"
         assert dispatched == [({"entity_id": "light.kitchen"}, "original-user")]
+        assert len(responses.call_args_list) == 2
+        assert all(
+            call.kwargs == ({} if effort == "default" else {"reasoning_effort": effort})
+            for call in responses.call_args_list
+        )
         assert responses.call_args.args[3][-1]["type"] == "function_call_output"
         assert responses.call_args.args[4][0]["type"] == "namespace"
         # The real Assist serializer must not leave a probatio UNSUPPORTED sentinel.

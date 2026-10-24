@@ -251,6 +251,8 @@ class ChatGPTConversation(conversation.ConversationEntity):
         search_enabled = self.entry.options.get("web_search", False)
         if search_enabled:
             tools.append({"type": "web_search"})
+        reasoning_effort = self.entry.options.get("reasoning_effort", "default")
+        reasoning_options = {} if reasoning_effort == "default" else {"reasoning_effort": reasoning_effort}
         seen: set[str] = set()
         for _ in range(MAX_ROUNDS):
             account = self.entry.runtime_data
@@ -261,6 +263,7 @@ class ChatGPTConversation(conversation.ConversationEntity):
                     self.entry.options["model"],
                     inputs_from_log(chat_log),
                     tools,
+                    **reasoning_options,
                 )
             )["output"]
             text, calls = parse_output(

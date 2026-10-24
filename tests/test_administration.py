@@ -490,6 +490,41 @@ async def test_disabling_administration_does_not_resend_sensitive_history(enviro
     provider.assert_not_called()
 
 
+async def test_reasoning_options_preserve_defaults_save_and_validate(environment, monkeypatch):
+    from custom_components.chatgpt_assist import config_flow as flow_module
+    from custom_components.chatgpt_assist.const import REASONING_EFFORTS
+
+    hass, entry, _, _, _ = environment
+    entry.runtime_data.access_token = AsyncMock(return_value="fake")
+    monkeypatch.setattr(
+        flow_module, "available_models", AsyncMock(return_value=[{"value": "test", "label": "Test"}])
+    )
+    monkeypatch.setattr(flow_module, "async_get_clientsession", lambda hass: None)
+    monkeypatch.setattr(ChatGPTOptionsFlow, "config_entry", property(lambda self: entry))
+    flow = ChatGPTOptionsFlow()
+    flow.hass = hass
+    form = await flow.async_step_settings()
+    values = validate_settings(form, {})
+    assert values["reasoning_effort"] == "default"
+    fields = {key.schema: value for key, value in settings_fields(form).items()}
+    assert [choice["value"] for choice in fields["reasoning_effort"].config["options"]] == list(
+        REASONING_EFFORTS
+    )
+    original_grants = {
+        key: values[key] for key in ("automation_ids", "dashboard_paths", "history_entity_ids")
+    }
+    saved = await flow.async_step_settings(validate_settings(form, {"reasoning_effort": "low"}))
+    assert saved["data"]["reasoning_effort"] == "low"
+    assert all(saved["data"][key] == value for key, value in original_grants.items())
+    entry.options.update(saved["data"])
+    reopened = await flow.async_step_settings()
+    assert suggested_settings(reopened)["reasoning_effort"] == "low"
+    with pytest.raises(vol.Invalid):
+        validate_settings(reopened, {"reasoning_effort": "ultra"})
+    invalid = await flow.async_step_settings({**values, "reasoning_effort": "ultra"})
+    assert invalid["errors"]["reasoning_effort"] == "invalid_reasoning_effort"
+
+
 async def test_permissions_checklists_discover_names_and_preserve_grants(environment, monkeypatch):
     from custom_components.chatgpt_assist import config_flow as flow_module
 

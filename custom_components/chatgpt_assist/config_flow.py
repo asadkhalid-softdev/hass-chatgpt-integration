@@ -27,7 +27,7 @@ from .administration import AdministrationError, scopes
 from .api import ModelError, available_models
 from .auth import AuthError, ConnectionError, validate_import
 from .compat import schema as vol
-from .const import DOMAIN
+from .const import DOMAIN, REASONING_EFFORTS
 from .history import choices as history_choices
 
 SETTINGS_SECTIONS = {
@@ -301,6 +301,8 @@ class ChatGPTOptionsFlow(OptionsFlow):
         opened = set()
         if user_input is not None:
             user_input = _flatten_settings(user_input)
+            if user_input.get("reasoning_effort", "default") not in REASONING_EFFORTS:
+                errors["reasoning_effort"] = "invalid_reasoning_effort"
             for field, (select_all, select_none, kind) in bulk_fields.items():
                 if user_input.get(select_all) and user_input.get(select_none):
                     errors[select_none] = "conflicting_bulk_selection"
@@ -360,6 +362,30 @@ class ChatGPTOptionsFlow(OptionsFlow):
                         {
                             vol.Required("model", default=self.config_entry.options["model"]): SelectSelector(
                                 SelectSelectorConfig(options=models)
+                            ),
+                            vol.Required(
+                                "reasoning_effort",
+                                default=self.config_entry.options.get("reasoning_effort", "default"),
+                            ): SelectSelector(
+                                SelectSelectorConfig(
+                                    options=[
+                                        {
+                                            "value": effort,
+                                            "label": {
+                                                "default": "Model default",
+                                                "none": "None",
+                                                "minimal": "Minimal",
+                                                "low": "Low",
+                                                "medium": "Medium",
+                                                "high": "High",
+                                                "xhigh": "Extra high",
+                                                "max": "Maximum",
+                                            }[effort],
+                                        }
+                                        for effort in REASONING_EFFORTS
+                                    ],
+                                    mode=SelectSelectorMode.DROPDOWN,
+                                )
                             ),
                             vol.Required(
                                 "control", default=self.config_entry.options.get("control", False)

@@ -199,7 +199,7 @@ async def test_real_agent_and_core_prompt_receive_voice_instructions_without_his
     from custom_components.chatgpt_assist.const import DOMAIN
 
     manager, hass, backend, entry, users, _, notifications, _ = bridge
-    entry.options.update(control=False, logs_access=False)
+    entry.options.update(control=False, logs_access=False, reasoning_effort="low")
     for user in users.values():
         user.name = user.id
     entry.runtime_data = SimpleNamespace(session=None, access_token=AsyncMock(return_value="test-token"))
@@ -227,6 +227,7 @@ async def test_real_agent_and_core_prompt_receive_voice_instructions_without_his
     await manager.accept(envelope())
     await finish(manager)
     inputs = provider.call_args.args[3]
+    assert provider.call_args.kwargs == {"reasoning_effort": "low"}
     assert "standalone voice question" in inputs[0]["content"]
     assert "450 characters" in inputs[0]["content"]
     assert [item for item in inputs if item.get("role") == "user"] == [
@@ -235,6 +236,7 @@ async def test_real_agent_and_core_prompt_receive_voice_instructions_without_his
     assert len(notifications) == 1
     await backend.send("one", "account", "normal follow up", "chat-2", Context(user_id="one"))
     normal_inputs = provider.call_args.args[3]
+    assert provider.call_args.kwargs == {"reasoning_effort": "low"}
     assert "standalone voice question" not in normal_inputs[0]["content"]
     assert {"role": "user", "content": "private chat secret"} in normal_inputs
     assert len(notifications) == 1
