@@ -148,7 +148,7 @@ class ChatGPTConversation(conversation.ConversationEntity):
                     str(err)
                     + (
                         " If this started after enabling internet search, disable Allow internet search in Configure or choose another model."
-                        if self.entry.options.get("web_search")
+                        if self.entry.options.get("web_search") and "reasoning" not in str(err).lower()
                         else ""
                     )
                     + " If earlier actions ran, check device state before retrying.",

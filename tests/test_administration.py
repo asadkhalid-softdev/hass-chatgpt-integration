@@ -525,6 +525,40 @@ async def test_reasoning_options_preserve_defaults_save_and_validate(environment
     assert invalid["errors"]["reasoning_effort"] == "invalid_reasoning_effort"
 
 
+async def test_model_change_rejects_minimal_and_old_invalid_setting_is_not_silently_saved(
+    environment, monkeypatch
+):
+    from custom_components.chatgpt_assist import config_flow as flow_module
+
+    hass, entry, _, _, _ = environment
+    entry.runtime_data.access_token = AsyncMock(return_value="fake")
+    monkeypatch.setattr(
+        flow_module,
+        "available_models",
+        AsyncMock(
+            return_value=[{"value": "test", "label": "Test"}, {"value": "gpt-6.1-sol", "label": "Sol"}]
+        ),
+    )
+    monkeypatch.setattr(flow_module, "async_get_clientsession", lambda hass: None)
+    monkeypatch.setattr(ChatGPTOptionsFlow, "config_entry", property(lambda self: entry))
+    flow = ChatGPTOptionsFlow()
+    flow.hass = hass
+    form = await flow.async_step_settings()
+    values = validate_settings(form, {"model": "gpt-6.1-sol", "reasoning_effort": "minimal"})
+    invalid = await flow.async_step_settings(values)
+    assert invalid["errors"]["reasoning_effort"] == "unsupported_reasoning_effort"
+    fields = {key.schema: value for key, value in settings_fields(invalid).items()}
+    choices = {item["value"] for item in fields["reasoning_effort"].config["options"]}
+    assert "minimal" not in choices and "none" not in choices
+    assert {"default", "low", "medium", "high", "xhigh", "max"} == choices
+    assert entry.options["model"] == "test"
+    entry.options.update(model="gpt-6.1-sol", reasoning_effort="minimal")
+    reopened = await flow.async_step_settings()
+    assert suggested_settings(reopened)["reasoning_effort"] == "default"
+    assert validate_settings(reopened, {})["reasoning_effort"] == "default"
+    assert entry.options["reasoning_effort"] == "minimal"
+
+
 async def test_permissions_checklists_discover_names_and_preserve_grants(environment, monkeypatch):
     from custom_components.chatgpt_assist import config_flow as flow_module
 

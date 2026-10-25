@@ -128,7 +128,8 @@
       "invalid_automation_id": "Use letters, numbers, underscores or hyphens for each new automation ID (maximum 128 characters).",
       "conflicting_bulk_selection": "Choose either Select all or Select none for this list, then submit again.",
       "alexa_invalid": "Could not save Alexa settings. Check the details above.",
-      "invalid_reasoning_effort": "Select an available reasoning effort."
+      "invalid_reasoning_effort": "Select an available reasoning effort.",
+      "unsupported_reasoning_effort": "This model does not support the selected reasoning effort. Choose Model default or an available effort."
     },
     "abort": {
       "no_proposals": "No saved proposals are available. Ask the assistant to prepare a configuration change first.",

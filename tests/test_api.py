@@ -73,6 +73,22 @@ async def test_invalid_reasoning_effort_never_sends_request():
     assert not hasattr(session, "payload")
 
 
+@pytest.mark.parametrize("model", ["gpt-6.1-sol", "gpt-6.1-sol-2026-10-01"])
+@pytest.mark.parametrize("effort", ["none", "minimal"])
+async def test_sol_unsupported_effort_is_rejected_before_request(model, effort):
+    session = Session([])
+    with pytest.raises(api.ModelError, match="Choose Low or Model default"):
+        await api.response(session, "secret", model, [], [], reasoning_effort=effort)
+    assert not hasattr(session, "payload")
+
+
+@pytest.mark.parametrize("effort", ["default", "low", "medium", "high", "xhigh", "max"])
+async def test_sol_supported_efforts_are_forwarded(effort):
+    session = Session([{"type": "response.completed", "response": {"status": "completed", "output": []}}])
+    await api.response(session, "secret", "gpt-6.1-sol", [], [], reasoning_effort=effort)
+    assert ("reasoning" in session.payload) is (effort != "default")
+
+
 def test_unsupported_reasoning_has_safe_actionable_error():
     error = api.provider_error(
         {"error": {"code": "unsupported_value", "param": "reasoning.effort", "message": "private"}},

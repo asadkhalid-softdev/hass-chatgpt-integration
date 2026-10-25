@@ -9,7 +9,7 @@ from typing import Any
 import aiohttp
 
 from .auth import AuthError, ConnectionError, request_json
-from .const import API_URL, MAX_INPUT_BYTES, MAX_RESPONSE_BYTES, REASONING_EFFORTS
+from .const import API_URL, MAX_INPUT_BYTES, MAX_RESPONSE_BYTES, REASONING_EFFORTS, reasoning_efforts
 
 
 class ModelError(Exception):
@@ -165,6 +165,10 @@ async def response(
     """Require a completed, bounded response before any HA tool executes."""
     if reasoning_effort not in REASONING_EFFORTS:
         raise ModelError("Invalid reasoning effort. Choose a supported effort in Configure.")
+    if reasoning_effort not in reasoning_efforts(model):
+        raise ModelError(
+            "The selected model does not support this reasoning effort. Choose Low or Model default in Configure."
+        )
     payload: dict = {
         "model": model,
         "input": inputs,

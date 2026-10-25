@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.1
+
+- Hide None and Minimal reasoning for GPT-6.1 Sol and reject incompatible model/effort selections before saving or sending an API request.
+- Repair the displayed suggestion for an existing incompatible setting without silently changing the saved value.
+
 ## 0.9.0
 
 - Share the configured HA user/assistant's sidebar conversation context with Alexa turns, including persisted context after session expiry or restart.

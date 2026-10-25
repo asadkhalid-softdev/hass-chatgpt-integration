@@ -27,7 +27,7 @@ from .administration import AdministrationError, scopes
 from .api import ModelError, available_models
 from .auth import AuthError, ConnectionError, validate_import
 from .compat import schema as vol
-from .const import DOMAIN, REASONING_EFFORTS
+from .const import DOMAIN, REASONING_EFFORTS, reasoning_efforts
 from .history import choices as history_choices
 
 SETTINGS_SECTIONS = {
@@ -290,6 +290,7 @@ class ChatGPTOptionsFlow(OptionsFlow):
 
     async def async_step_settings(self, user_input=None):
         errors = {}
+        selected_model = self.config_entry.options["model"]
         choices, notice = await self.config_entry.runtime_data.administration.choices()
         choices["history"] = history_choices(self.hass, self.config_entry.options)
         bulk_fields = {
@@ -301,8 +302,11 @@ class ChatGPTOptionsFlow(OptionsFlow):
         opened = set()
         if user_input is not None:
             user_input = _flatten_settings(user_input)
+            selected_model = user_input.get("model", selected_model)
             if user_input.get("reasoning_effort", "default") not in REASONING_EFFORTS:
                 errors["reasoning_effort"] = "invalid_reasoning_effort"
+            elif user_input.get("reasoning_effort", "default") not in reasoning_efforts(selected_model):
+                errors["reasoning_effort"] = "unsupported_reasoning_effort"
             for field, (select_all, select_none, kind) in bulk_fields.items():
                 if user_input.get(select_all) and user_input.get(select_none):
                     errors[select_none] = "conflicting_bulk_selection"
@@ -354,6 +358,8 @@ class ChatGPTOptionsFlow(OptionsFlow):
                 "dashboard_paths": sorted(scopes(self.config_entry.options, "dashboard")),
             }
         )
+        if suggested.get("reasoning_effort", "default") not in reasoning_efforts(selected_model):
+            suggested = {**suggested, "reasoning_effort": "default"}
         return self.async_show_form(
             step_id="settings",
             data_schema=self.add_suggested_values_to_schema(
@@ -365,7 +371,7 @@ class ChatGPTOptionsFlow(OptionsFlow):
                             ),
                             vol.Required(
                                 "reasoning_effort",
-                                default=self.config_entry.options.get("reasoning_effort", "default"),
+                                default=suggested.get("reasoning_effort", "default"),
                             ): SelectSelector(
                                 SelectSelectorConfig(
                                     options=[
@@ -382,7 +388,7 @@ class ChatGPTOptionsFlow(OptionsFlow):
                                                 "max": "Maximum",
                                             }[effort],
                                         }
-                                        for effort in REASONING_EFFORTS
+                                        for effort in reasoning_efforts(selected_model)
                                     ],
                                     mode=SelectSelectorMode.DROPDOWN,
                                 )

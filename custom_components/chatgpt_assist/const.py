@@ -24,3 +24,10 @@ DEFAULT_PROMPT = (
     "Ask for clarification when the target or requested action is ambiguous. "
     "Only act on the user's explicit request. Administrative changes require configuration tools and separate human approval."
 )
+
+
+def reasoning_efforts(model: str) -> tuple[str, ...]:
+    """Exclude documented unsupported efforts; unknown models retain API choices."""
+    if model == "gpt-6.1-sol" or model.startswith("gpt-6.1-sol-"):
+        return tuple(effort for effort in REASONING_EFFORTS if effort not in {"none", "minimal"})
+    return REASONING_EFFORTS
