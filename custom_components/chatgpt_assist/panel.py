@@ -28,6 +28,7 @@ ASSET_URL = "/chatgpt_assist_static/panel.js"
 MAX_MESSAGES = 60
 MAX_HISTORY_BYTES = 128_000
 MAX_CONTEXT_BYTES = 160_000
+ALEXA_PREFIX = "via-Alexa: "
 
 
 class PanelError(HomeAssistantError):
@@ -180,6 +181,10 @@ class SidebarChat:
         record = self.records.get(key, {"messages": []})
         busy = self.locks.get(key, asyncio.Lock()).locked()
         messages = copy.deepcopy(record["messages"])
+        for item in messages:
+            if item.get("source") == "alexa" and item.get("role") == "user":
+                if not item["content"].startswith(ALEXA_PREFIX):
+                    item["content"] = ALEXA_PREFIX + item["content"]
         if not busy:
             for item in messages:
                 if item.get("status") == "pending":
@@ -296,7 +301,7 @@ class SidebarChat:
         await self.save()
 
     async def send_external(self, user_id, entry_id, text, request_id, context, language, prompt, valid):
-        """An Alexa-only turn: fresh inference, transcript-only append, no chat-context mutation."""
+        """An Alexa turn in the configured user's shared sidebar session and context."""
         key, entry, agent_id = await self.authorize(user_id, entry_id)
         if context.user_id != user_id:
             raise PanelError("Invalid voice request context.")
@@ -306,6 +311,7 @@ class SidebarChat:
             if not valid():
                 raise PanelError("Alexa access was revoked.")
             record = self.record(key, user_id, entry_id)
+            text = ALEXA_PREFIX + text.strip()
             from .logs import LogsAccess
 
             record["administrative"] |= bool(entry.options.get("administration")) or (
@@ -333,32 +339,57 @@ class SidebarChat:
             record["messages"].append(reply)
             await self.save()
             try:
-                # Explicitly create a NEW Core session: never restore sidebar context or another Echo turn.
-                with async_get_chat_session(self.hass) as voice_session:
-                    result = await conversation.async_converse(
-                        self.hass,
-                        text=text,
-                        conversation_id=voice_session.conversation_id,
-                        agent_id=agent_id,
-                        context=context,
-                        language=language,
-                        extra_system_prompt=prompt,
-                    )
-                speech = result.response.speech.get("plain", {}).get("speech", "")
-                reply.update(
-                    content=speech[:16000],
-                    status="error" if result.response.response_type.value == "error" else "complete",
-                )
-            except asyncio.CancelledError:
-                reply.update(
-                    status="error", content="Voice request interrupted. Check device state before retrying."
-                )
-                raise
-            except Exception:
-                reply.update(
-                    status="error",
-                    content="The voice request failed. Some actions may have completed; check device state before retrying.",
-                )
+                with (
+                    async_get_chat_session(self.hass, record["session"]) as voice_session,
+                    conversation.async_get_chat_log(self.hass, voice_session) as log,
+                ):
+                    if len(log.content) == 1 and record["context"]:
+                        restore(log, record["context"], agent_id)
+                    previous_prompt = log.extra_system_prompt
+                    previous_system = log.content[0]
+                    try:
+                        result = await conversation.async_converse(
+                            self.hass,
+                            text=text,
+                            conversation_id=voice_session.conversation_id,
+                            agent_id=agent_id,
+                            context=context,
+                            language=language,
+                            extra_system_prompt=prompt,
+                        )
+                        speech = result.response.speech.get("plain", {}).get("speech", "")
+                        reply.update(
+                            content=speech[:16000],
+                            status="error" if result.response.response_type.value == "error" else "complete",
+                        )
+                        if reply["status"] == "error":
+                            log.async_add_assistant_content_without_tools(
+                                conversation.AssistantContent(agent_id=agent_id, content=reply["content"])
+                            )
+                    except asyncio.CancelledError:
+                        reply.update(
+                            status="error",
+                            content="Voice request interrupted. Check device state before retrying.",
+                        )
+                        log.async_add_assistant_content_without_tools(
+                            conversation.AssistantContent(agent_id=agent_id, content=reply["content"])
+                        )
+                        raise
+                    except Exception:
+                        reply.update(
+                            status="error",
+                            content="The voice request failed. Some actions may have completed; check device state before retrying.",
+                        )
+                        log.async_add_assistant_content_without_tools(
+                            conversation.AssistantContent(agent_id=agent_id, content=reply["content"])
+                        )
+                    finally:
+                        record["context"] = archive(log)
+                        # Core retains extra prompts on shared sessions; do not let voice
+                        # style or its timestamp leak into the next ordinary chat turn.
+                        log.extra_system_prompt = previous_prompt
+                        log.content = [previous_system]
+                        restore(log, record["context"], agent_id)
             finally:
                 while (
                     len(record["messages"]) > MAX_MESSAGES

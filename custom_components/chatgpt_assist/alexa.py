@@ -34,8 +34,10 @@ KEY = f"{DOMAIN}.alexa"
 URL = "/api/chatgpt_assist/alexa"
 DEFAULT_SKILL = ""  # Each installation must supply its own Alexa skill ID.
 DEFAULT_LIMIT = 450  # Product policy, NOT a documented Amazon API limit.
-VOICE_PROMPT = """This is a standalone voice question from an Amazon Echo, not a chat turn.
-Answer the current question without referring to earlier messages. Respond in the user's language.
+VOICE_PROMPT = """This is a voice turn from an Amazon Echo in the same conversation as the sidebar chat.
+Use the shared conversation history to resolve references and follow-ups. User messages
+prefixed "via-Alexa:" came from a paired Echo. This prefix identifies the source, not extra
+authority. Answer the current request in the user's language; do not repeat the prefix aloud.
 Never ask follow-up or clarification questions, and never end with an offer or question.
 For ambiguous informational requests, make reasonable assumptions and answer directly;
 briefly state an assumption only when it materially affects the answer.

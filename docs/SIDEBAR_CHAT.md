@@ -27,6 +27,14 @@ Internet search is controlled by **Allow internet search** in Configure. Direct 
 
 History belongs to your Home Assistant user and the selected account. It is saved on HA, not in browser local storage, so refreshing the page or reopening the sidebar restores it. Native model/tool context is restored after HA’s normal chat-session expiry or a restart, preserving recent follow-ups without replaying old actions.
 
+From 0.9.0, Alexa uses this same history for the HA user and assistant selected in the
+Alexa bridge settings. New Alexa questions and answers become model context for both
+entry points. Voice user messages begin with `via-Alexa: `; ordinary chat messages do not.
+All paired Echos on that configuration share the selected user's context. Other HA users
+and assistant entries remain isolated. The voice response style applies only to that
+voice turn, and sidebar sends never trigger Echo speech. Older transcript-only Alexa
+turns get the displayed prefix without being retroactively injected into model context.
+
 Up to 60 displayed messages are retained, within a 128 KB budget; older messages are removed in user/assistant pairs. Native context is separately bounded to 160 KB and trimmed at whole-turn boundaries. Very long answers are shortened in the sidebar. Ask for a smaller section when needed. Other open tabs refresh their chat view when reopened or refreshed.
 
 ## Clear history

@@ -11,8 +11,11 @@ identifiers in a signed request. The integration verifies it, persists a dedupli
 record, schedules work in Home Assistant, and immediately closes the skill with
 “Let me check.” Generation does not wait inside the skill request.
 
-Every voice question uses a fresh HA conversation session with additional voice-specific
-instructions. Alexa answers directly without follow-up or clarification questions.
+Alexa and the sidebar share the configured HA user/assistant's conversation session
+and saved model context. New voice questions can refer to earlier sidebar or voice turns.
+The current voice turn receives additional voice-specific instructions, which are removed
+from the active session afterward so normal chat retains its usual response style.
+Alexa answers directly without follow-up or clarification questions.
 The prompt includes Home Assistant's current local timestamp and configured timezone.
 Unspecified periods use the current calendar period (for example, an unspecified month
 means the current month); a named month without a year uses the current year. Explicit
@@ -21,17 +24,28 @@ use actual available readings/history, never invented timestamps. Ambiguous info
 requests use reasonable assumptions; unresolved action targets are declined without a
 follow-up question. These are model instructions, not a guarantee of model compliance.
 
-No earlier sidebar or Echo messages are included. The user question and
-answer are appended to the selected HA user's existing sidebar transcript, labelled
-Alexa. The sidebar refreshes external messages automatically without changing its
-composer. These transcript-only messages do not become normal chat inference context.
+The user question and answer are appended to the selected HA user's existing sidebar
+transcript, labelled Alexa. Voice user messages begin with `via-Alexa: ` in both the
+transcript and new model context. The prefix identifies the source and grants no extra
+authority. The sidebar refreshes external messages automatically without changing its
+composer. Ordinary chat turns can refer to new Alexa turns, too.
+
+History remains scoped to the configured HA user and assistant. All paired Echos using
+that configuration share this context, including that user's earlier private sidebar
+messages. Clearing sidebar history resets the shared conversation. Requests are serialized
+with sidebar sends so simultaneous turns cannot overwrite each other.
+
+Alexa transcripts created before 0.9.0 remain visible and gain the displayed prefix.
+Those older transcript-only turns are not retroactively injected into native model/tool
+context; previously saved sidebar inference context is preserved, and new Alexa turns
+join it going forward.
 Normal sidebar messages retain their existing conversation behavior and never trigger
 Alexa notification delivery.
 
 Only the originating device's explicitly paired `alexa_media` entity receives the reply,
 through `notify.alexa_media` with `type: tts`. No “last called” lookup or broadcast fallback
 is used. The notification does not reopen the microphone. Ask the skill again for another
-question; it will also start with fresh context.
+question; it will use the shared conversation history.
 
 ## Home Assistant setup
 
@@ -170,7 +184,9 @@ questions, provider tokens or certificate bodies are logged by the bridge.
 - Enable and pair one real Echo; confirm an unpaired Echo cannot trigger inference.
 - Ask for a known sensor reading; check that only the requesting Echo speaks it and
   the same user/answer appear in the selected user's open sidebar.
-- Ask two independent voice questions; confirm the second has no previous-turn context.
+- Put a harmless fact in sidebar chat, ask Alexa about it, then ask a sidebar follow-up
+  about the voice reply. Confirm shared context and the `via-Alexa:` prefix.
+- Clear sidebar history and confirm Alexa no longer receives that context.
 - Send a normal sidebar message; confirm it stays silent on every Echo and normal chat
   context continues to work.
 - Try a slow historical question; confirm the skill closes promptly and the eventual

@@ -1,4 +1,4 @@
-"""Alexa signature boundaries, exact-device jobs and context-free sidebar transcripts."""
+"""Alexa signature boundaries, exact-device jobs and shared sidebar conversation history."""
 
 import asyncio
 import base64
@@ -146,29 +146,30 @@ def test_bundled_model_supports_elicitation_without_invalid_bare_intent_sample()
     assert slot["prompts"]["elicitation"] in {p["id"] for p in model["prompts"]}
 
 
-async def test_voice_has_no_history_and_does_not_mutate_chat_inference_context(bridge):
+async def test_voice_and_chat_share_context_and_only_voice_speaks(bridge):
     manager, _, backend, _, _, calls, notifications, target = bridge
     await backend.send("one", "account", "private earlier chat", "chat-1", Context(user_id="one"))
-    before = copy.deepcopy(next(iter(backend.records.values()))["context"])
     reply = await manager.accept(envelope())
     assert reply["response"]["shouldEndSession"] is True
     assert notifications == []  # Acknowledge without waiting for inference/TTS.
     await finish(manager)
     assert [item for item in calls[-1]["inputs"] if item.get("role") == "user"] == [
-        {"role": "user", "content": "bedroom temperature"}
+        {"role": "user", "content": "private earlier chat"},
+        {"role": "user", "content": "via-Alexa: bedroom temperature"},
     ]
     assert calls[-1]["context"].user_id == "one"
     record = next(iter(backend.records.values()))
-    assert record["context"] == before
+    assert {"role": "user", "content": "via-Alexa: bedroom temperature"} in record["context"]
+    assert record["messages"][-2]["content"] == "via-Alexa: bedroom temperature"
     assert record["messages"][-1]["source"] == "alexa"
     assert record["messages"][-1]["delivery"] == "submitted"
     assert notifications == [{"target": [target], "message": "A helpful answer.", "data": {"type": "tts"}}]
     await manager.accept(envelope(request="second"))
     await finish(manager)
-    assert sum(item.get("role") == "user" for item in calls[-1]["inputs"]) == 1
+    assert sum(item.get("role") == "user" for item in calls[-1]["inputs"]) == 3
     await backend.send("one", "account", "ordinary follow up", "chat-2", Context(user_id="one"))
     assert {"role": "user", "content": "private earlier chat"} in calls[-1]["inputs"]
-    assert {"role": "user", "content": "bedroom temperature"} not in calls[-1]["inputs"]
+    assert {"role": "user", "content": "via-Alexa: bedroom temperature"} in calls[-1]["inputs"]
     assert len(notifications) == 2  # Ordinary chat never speaks.
     assert len((await backend.history("one", "account"))["messages"]) == 8
     assert (await backend.history("two", "account"))["messages"] == []
@@ -197,7 +198,53 @@ async def test_voice_prompt_is_separate_and_sent_only_for_external_requests(brid
     assert "extra_system_prompt" not in kwargs_seen[-1]
 
 
-async def test_real_agent_and_core_prompt_receive_voice_instructions_without_history(bridge, monkeypatch):
+async def test_shared_voice_history_survives_session_expiry_and_clear_resets_both(bridge):
+    from homeassistant.helpers.chat_session import DATA_CHAT_SESSION
+
+    from custom_components.chatgpt_assist import panel
+
+    manager, hass, backend, entry, _, calls, _, _ = bridge
+    await backend.send("one", "account", "chat fact", "chat", Context(user_id="one"))
+    await manager.accept(envelope())
+    await finish(manager)
+    recovered = panel.SidebarChat(hass)
+    await recovered.load()
+    recovered.entries[entry.entry_id] = entry
+    for session in hass.data[DATA_CHAT_SESSION].values():
+        session.async_cleanup()
+    hass.data[DATA_CHAT_SESSION].clear()
+    hass.data[panel.PANEL_KEY] = recovered
+    await manager.accept(envelope(request="after-restart"))
+    await finish(manager)
+    assert {"role": "user", "content": "chat fact"} in calls[-1]["inputs"]
+    assert sum(item.get("content") == "via-Alexa: bedroom temperature" for item in calls[-1]["inputs"]) == 2
+    assert (await recovered.history("two", "account"))["messages"] == []
+    await recovered.clear("one", "account")
+    await manager.accept(envelope(request="after-clear"))
+    await finish(manager)
+    assert [item for item in calls[-1]["inputs"] if item.get("role") == "user"] == [
+        {"role": "user", "content": "via-Alexa: bedroom temperature"}
+    ]
+
+
+async def test_legacy_voice_transcripts_display_prefix_without_rewriting_saved_history(bridge):
+    manager, _, backend, _, _, _, _, _ = bridge
+    key, _, _ = await backend.authorize("one", "account")
+    record = backend.record(key, "one", "account")
+    record["messages"] = [
+        {"role": "user", "content": "old voice question", "source": "alexa"},
+        {"role": "user", "content": "via-Alexa: already prefixed", "source": "alexa"},
+    ]
+    history = await backend.history("one", "account")
+    assert [item["content"] for item in history["messages"]] == [
+        "via-Alexa: old voice question",
+        "via-Alexa: already prefixed",
+    ]
+    assert record["messages"][0]["content"] == "old voice question"
+    assert not manager.tasks
+
+
+async def test_real_agent_shares_history_and_does_not_leak_voice_instructions(bridge, monkeypatch):
     from homeassistant.components.conversation import agent_manager
     from homeassistant.components.conversation.const import DATA_COMPONENT
 
@@ -234,16 +281,19 @@ async def test_real_agent_and_core_prompt_receive_voice_instructions_without_his
     await finish(manager)
     inputs = provider.call_args.args[3]
     assert provider.call_args.kwargs == {"reasoning_effort": "low"}
-    assert "standalone voice question" in inputs[0]["content"]
+    assert "voice turn from an Amazon Echo" in inputs[0]["content"]
     assert "450 characters" in inputs[0]["content"]
     assert [item for item in inputs if item.get("role") == "user"] == [
-        {"role": "user", "content": "bedroom temperature"}
+        {"role": "user", "content": "private chat secret"},
+        {"role": "user", "content": "via-Alexa: bedroom temperature"},
     ]
     assert len(notifications) == 1
     await backend.send("one", "account", "normal follow up", "chat-2", Context(user_id="one"))
     normal_inputs = provider.call_args.args[3]
     assert provider.call_args.kwargs == {"reasoning_effort": "low"}
-    assert "standalone voice question" not in normal_inputs[0]["content"]
+    assert "voice turn from an Amazon Echo" not in normal_inputs[0]["content"]
+    assert "Never ask follow-up" not in normal_inputs[0]["content"]
+    assert {"role": "user", "content": "via-Alexa: bedroom temperature"} in normal_inputs
     assert {"role": "user", "content": "private chat secret"} in normal_inputs
     assert len(notifications) == 1
 

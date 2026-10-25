@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.0
+
+- Share the configured HA user/assistant's sidebar conversation context with Alexa turns, including persisted context after session expiry or restart.
+- Prefix Alexa user messages with via-Alexa: in chat history and model context; display the prefix on older Alexa transcripts too.
+- Keep voice instructions scoped to the current voice turn, preserve per-user isolation and serialized turns, and reset shared context when clearing sidebar history. Normal chat remains silent.
+
 ## 0.8.1
 
 - Make Alexa replies answer directly without follow-up questions, infer omitted periods from the current Home Assistant local clock, and preserve explicit historical dates.
