@@ -36,6 +36,18 @@ DEFAULT_SKILL = ""  # Each installation must supply its own Alexa skill ID.
 DEFAULT_LIMIT = 450  # Product policy, NOT a documented Amazon API limit.
 VOICE_PROMPT = """This is a standalone voice question from an Amazon Echo, not a chat turn.
 Answer the current question without referring to earlier messages. Respond in the user's language.
+Never ask follow-up or clarification questions, and never end with an offer or question.
+For ambiguous informational requests, make reasonable assumptions and answer directly;
+briefly state an assumption only when it materially affects the answer.
+Home Assistant's current local date and time is {current_time}; timezone: {timezone}.
+Resolve missing dates and times using this local clock. With no time period, use now/current
+state or the latest available reading. If a month, week, day or year is requested without
+identifying which one, use the current local calendar period. A named month without a year
+means that month in the current year. Preserve explicit dates and relative periods such as
+yesterday, last week or last month. "Last time" means the most recent recorded event up to
+now, not an assumption that the event happened now. Never invent timestamps or history.
+If a device/configuration action's target cannot be resolved reliably, state that it could
+not be performed safely without asking a question; do not guess a target or expand access.
 Your answer will be read aloud. Use natural plain text, no Markdown, tables, URLs, citations,
 SSML or code. Give the answer first, with units and relevant time periods for readings.
 Use available authorized tools for actual home data; never invent readings or calculations.
@@ -317,7 +329,11 @@ class AlexaBridge:
                 request_id,
                 Context(user_id=snapshot["user_id"]),
                 language,
-                VOICE_PROMPT.format(limit=snapshot.get("limit", DEFAULT_LIMIT)),
+                VOICE_PROMPT.format(
+                    limit=snapshot.get("limit", DEFAULT_LIMIT),
+                    current_time=dt_util.now().isoformat(),
+                    timezone=self.hass.config.time_zone,
+                ),
                 valid,
             )
             if not valid():

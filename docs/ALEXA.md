@@ -12,7 +12,16 @@ record, schedules work in Home Assistant, and immediately closes the skill with
 “Let me check.” Generation does not wait inside the skill request.
 
 Every voice question uses a fresh HA conversation session with additional voice-specific
-instructions. No earlier sidebar or Echo messages are included. The user question and
+instructions. Alexa answers directly without follow-up or clarification questions.
+The prompt includes Home Assistant's current local timestamp and configured timezone.
+Unspecified periods use the current calendar period (for example, an unspecified month
+means the current month); a named month without a year uses the current year. Explicit
+dates and relative periods such as last month take priority. Latest/last-event questions
+use actual available readings/history, never invented timestamps. Ambiguous informational
+requests use reasonable assumptions; unresolved action targets are declined without a
+follow-up question. These are model instructions, not a guarantee of model compliance.
+
+No earlier sidebar or Echo messages are included. The user question and
 answer are appended to the selected HA user's existing sidebar transcript, labelled
 Alexa. The sidebar refreshes external messages automatically without changing its
 composer. These transcript-only messages do not become normal chat inference context.

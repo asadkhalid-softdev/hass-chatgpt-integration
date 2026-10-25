@@ -184,9 +184,15 @@ async def test_voice_prompt_is_separate_and_sent_only_for_external_requests(brid
         return await original(*args, **kwargs)
 
     monkeypatch.setattr(conversation, "async_converse", capture)
+    before = alexa.dt_util.now()
     await manager.accept(envelope())
     await finish(manager)
-    assert "450 characters" in kwargs_seen[-1]["extra_system_prompt"]
+    prompt = kwargs_seen[-1]["extra_system_prompt"]
+    assert "450 characters" in prompt
+    assert "Never ask follow-up or clarification questions" in prompt
+    clock = prompt.split("current local date and time is ", 1)[1].split("; timezone:", 1)[0]
+    assert before <= datetime.fromisoformat(clock) <= alexa.dt_util.now()
+    assert f"timezone: {manager.hass.config.time_zone}" in prompt
     await backend.send("one", "account", "normal", "normal", Context(user_id="one"))
     assert "extra_system_prompt" not in kwargs_seen[-1]
 

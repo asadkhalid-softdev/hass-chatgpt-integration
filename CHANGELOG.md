@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1
+
+- Make Alexa replies answer directly without follow-up questions, infer omitted periods from the current Home Assistant local clock, and preserve explicit historical dates.
+- Bundle original transparent integration icons at standard and high-resolution Home Assistant brand sizes.
+
 ## 0.8.0
 
 - Add a Reasoning effort selector to Configure with the documented Responses API effort values and a backward-compatible Model default option.
