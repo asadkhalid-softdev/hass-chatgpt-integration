@@ -1,7 +1,7 @@
 # Reasoning effort
 
 After updating to 0.8.0 and restarting Home Assistant, open **Settings → Devices &
-services → ChatGPT Assist → Configure → Settings** and choose **Reasoning effort**
+services → ChatGPT Assist → Configure → Model and permissions** and choose **Reasoning effort**
 below the model. Save to apply it to Assist, sidebar chat, and Alexa requests.
 
 | Setting | API value |
